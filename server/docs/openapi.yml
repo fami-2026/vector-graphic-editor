@@ -1,0 +1,211 @@
+openapi: 3.0.0
+info:
+  title: Vector Graphic Editor API
+  description: API for managing canvas in vector graphic editor
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:9090/api
+    description: Development server
+
+paths:
+  /canvas:
+    get:
+      summary: Get all canvases metadata
+      operationId: getCanvasesMeta
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+              example:
+                code: 200
+                data:
+                  - id: "507f1f77bcf86cd799439011"
+                    title: "My First Canvas"
+                    createdAt: "2026-02-23T10:30:00"
+                    updatedAt: "2026-02-23T10:30:00"
+
+    post:
+      summary: Create a new canvas
+      operationId: createCanvas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasDto'
+      responses:
+        '201':
+          description: Canvas created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+  /canvas/{id}:
+    get:
+      summary: Get canvas by ID
+      operationId: getCanvasById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        '400':
+          description: Canvas not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+    put:
+      summary: Update an existing canvas
+      operationId: updateCanvas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanvasDto'
+      responses:
+        '200':
+          description: Canvas updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        '400':
+          description: Canvas not exist or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+    delete:
+      summary: Delete a canvas
+      operationId: deleteCanvas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Canvas deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        '400':
+          description: Canvas not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+components:
+  schemas:
+    CanvasDto:
+      type: object
+      properties:
+        title:
+          type: string
+        state:
+          type: string
+      required:
+        - title
+        - state
+      example:
+        title: "My Canvas"
+        state: "{}"
+
+    Canvas:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+      example:
+        id: "507f1f77bcf86cd799439011"
+        title: "My Canvas"
+        createdAt: "2026-02-23T10:30:00"
+        updatedAt: "2026-02-23T10:30:00"
+        state: "{}"
+
+    CanvasMeta:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        id: "507f1f77bcf86cd799439011"
+        title: "My Canvas"
+        createdAt: "2026-02-23T10:30:00"
+        updatedAt: "2026-02-23T10:30:00"
+
+    Response:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+          nullable: true
+        data:
+          oneOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/CanvasMeta'
+            - $ref: '#/components/schemas/Canvas'
+            - $ref: '#/components/schemas/CanvasMeta'
+          nullable: true
+      required:
+        - code
+      example:
+        code: 200
+        data:
+          - id: "507f1f77bcf86cd799439011"
+            title: "My Canvas"
+            createdAt: "2026-02-23T10:30:00"
+            updatedAt: "2026-02-23T10:30:00"
