@@ -4,6 +4,8 @@ server:
     context-path: /api
 
 spring:
+  jackson:
+    default-property-inclusion: non_null
   mongodb:
     host: { { mongo_host } }
     port: { { mongo_port } }
