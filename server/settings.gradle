@@ -4,4 +4,4 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'editor-server'
+rootProject.name = 'vge-server'

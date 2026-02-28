@@ -1,34 +1,21 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
 {
-	"name": "Ubuntu",
-	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+	"name": "Vector Graphics Editor",
+	"image": "ghcr.io/fami-2026/vge.dev:latest",
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	"features": {
-		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
-		"ghcr.io/devcontainers/features/java:1": {
-			"version": "21",
-			"installGradle": true,
-			"gradleVersion": "8.14"
-		},
-		"ghcr.io/devcontainers/features/python:1": {
-			"version": "3.14.2"
-		},
-		"ghcr.io/devcontainers/features/node:1": {
-			"version": "24.13.1"
-		},
-		"ghcr.io/devcontainers-extra/features/go-task:1": {}
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
 	},
+
 	"runArgs": [
+		"--env-file=.devcontainer/secret.dev.env",
 		"--network=host"
 	],
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "uname -a",
+	"forwardPorts": [],
 
 	// Configure tool-specific properties.
 	"customizations": {
@@ -41,7 +28,4 @@
 			]
 		}
 	}
-
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
 }

@@ -1,14 +1,24 @@
-version: '3'
+version: "3"
+
+vars:
+  REGISTRY: ghcr.io/fami-2026
 
 includes:
+  dev:
+    taskfile: ./.devcontainer/Taskfile.yaml
+    dir: ./.devcontainer
   server:
     taskfile: ./server/Taskfile.yaml
     dir: ./server
+  client:
+    taskfile: ./frontend/Taskfile.yaml
+    dir: ./frontend
 
 tasks:
   build:
     cmds:
       - task: server:image
+      - task: client:image
   deploy:
     cmds:
       - docker compose up -d

@@ -1,6 +1,9 @@
-version: '3'
+version: "3"
 
 tasks:
   image:
     cmds:
-      - docker build -t editor-server:latest .
+      - docker build -t {{.REGISTRY}}/vge.server:latest .
+  publish:
+    cmds:
+      - docker push {{.REGISTRY}}/vge.server:latest
