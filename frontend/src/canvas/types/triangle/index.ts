@@ -1,0 +1,1 @@
+export { TriangleShape } from './triangle';

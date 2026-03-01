@@ -1,0 +1,1 @@
+export { PolygonShape } from './polygon';

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import type { Shape } from '@/canvas/types';
 import { shapeRegistry } from '@/canvas/types';
 import { generateId } from '@/canvas/utils/math';
+import { PolygonShape } from '@/canvas/types/polygon/polygon';
 
 /**
  * Хранилище состояния сцены: фигуры, выделение, операции.
@@ -15,7 +16,23 @@ export const useCanvasStore = defineStore('canvas', () => {
         () => shapes.value.find((s) => s.id === selectedId.value) ?? null
     );
 
-    function addShape(type: string, pos: { x: number; y: number }) {
+    function addShape(type: string, pos: { x: number; y: number }, params?: any) {
+        // Для многоугольника передаем параметры
+        if (type === 'polygon' && params?.sides) {
+            const shape = new PolygonShape(
+                generateId(),
+                pos,
+                params.sides,  
+                50,            
+                0,            
+                'transparent',
+                '#000000',   
+                2              
+            );
+            shapes.value.push(shape);
+            return shape;
+        }
+        
         const shape = shapeRegistry.create(type, generateId(), pos);
         shapes.value.push(shape);
         return shape;
