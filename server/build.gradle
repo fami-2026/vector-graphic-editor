@@ -5,7 +5,7 @@ plugins {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
 
     compileOnly("org.projectlombok:lombok:1.18.42")
@@ -13,5 +13,9 @@ dependencies {
 }
 
 springBoot {
-    mainClass = 'org.editor.Editor'
+    mainClass = 'org.editor.EditorApplication'
+}
+
+bootJar {
+    archiveFileName = 'vge-server.jar'
 }

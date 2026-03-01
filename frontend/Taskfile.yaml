@@ -1,0 +1,6 @@
+version: "3"
+
+tasks:
+  image:
+    cmds:
+      - docker build -t {{.REGISTRY}}/vge.client:latest .
