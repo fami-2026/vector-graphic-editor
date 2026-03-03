@@ -4,3 +4,12 @@ tasks:
   image:
     cmds:
       - docker build -t {{.REGISTRY}}/vge.client:latest .
+  ci:
+    cmds:
+      - npm ci
+  ci:format:
+    cmds:
+      - npm run format
+  ci:lint:
+    cmds:
+      - npm run lint

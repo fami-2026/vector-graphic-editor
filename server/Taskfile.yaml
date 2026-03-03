@@ -7,3 +7,6 @@ tasks:
   publish:
     cmds:
       - docker push {{.REGISTRY}}/vge.server:latest
+  ci:format:
+    cmds:
+      - gradle spotlessApply

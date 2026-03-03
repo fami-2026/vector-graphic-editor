@@ -1,5 +1,8 @@
 package org.editor.control.service;
 
+import static java.util.Objects.*;
+
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.editor.control.dao.CanvasRepository;
@@ -9,10 +12,6 @@ import org.editor.control.mapping.CanvasMapper;
 import org.editor.entity.dto.CanvasMeta;
 import org.editor.entity.mongo.Canvas;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-import static java.util.Objects.*;
 
 @Slf4j
 @Service
@@ -25,9 +24,7 @@ public class CanvasServiceImpl implements CanvasService {
 
     @Override
     public List<CanvasMeta> getAllMeta() {
-        return canvasRepository.findAll().stream()
-                .map(canvasMapper::mapToMeta)
-                .toList();
+        return canvasRepository.findAll().stream().map(canvasMapper::mapToMeta).toList();
     }
 
     @Override

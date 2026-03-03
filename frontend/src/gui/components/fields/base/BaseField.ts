@@ -21,7 +21,10 @@ export abstract class BaseField {
     /**
      * Валидация значения с учётом дескриптора свойства
      */
-    abstract validate(value: unknown, descriptor: PropertyDescriptor): string | null;
+    abstract validate(
+        value: unknown,
+        descriptor: PropertyDescriptor
+    ): string | null;
 
     /**
      * Форматирование значения для отображения в UI

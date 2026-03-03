@@ -7,7 +7,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @SpringBootApplication
 @EnableMongoRepositories(basePackages = "org.editor.control.dao")
 public class EditorApplication {
-  public static void main(String[] args) {
-    SpringApplication.run(EditorApplication.class, args);
-  }
+    public static void main(String[] args) {
+        SpringApplication.run(EditorApplication.class, args);
+    }
 }

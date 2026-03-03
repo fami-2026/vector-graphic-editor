@@ -17,7 +17,12 @@ const emit = defineEmits<{
         type="color"
         :value="modelValue ?? '#000000'"
         :disabled="readonly"
-        @input="emit('update:modelValue', ($event.target as HTMLInputElement)?.value)"
+        @input="
+            emit(
+                'update:modelValue',
+                ($event.target as HTMLInputElement)?.value
+            )
+        "
     />
 </template>
 

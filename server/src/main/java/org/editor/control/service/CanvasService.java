@@ -1,9 +1,8 @@
 package org.editor.control.service;
 
+import java.util.List;
 import org.editor.entity.dto.CanvasMeta;
 import org.editor.entity.mongo.Canvas;
-
-import java.util.List;
 
 public interface CanvasService {
 

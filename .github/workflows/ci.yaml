@@ -1,0 +1,28 @@
+name: ci
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/fami-2026/vge.dev:latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Dependencies
+        run: task client:ci
+
+      - name: Lint
+        run: task client:ci:lint
+
+      - name: Format
+        run: |
+          task server:ci:format
+          task client:ci:format
+
+      - name: Commit
+        uses: EndBug/add-and-commit@v9
+        with:
+          message: 'ops/bot: #25: format and lint'

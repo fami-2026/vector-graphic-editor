@@ -4,9 +4,6 @@ vars:
   REGISTRY: ghcr.io/fami-2026
 
 includes:
-  dev:
-    taskfile: ./.devcontainer/Taskfile.yaml
-    dir: ./.devcontainer
   server:
     taskfile: ./server/Taskfile.yaml
     dir: ./server

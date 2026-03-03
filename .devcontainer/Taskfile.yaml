@@ -1,9 +1,0 @@
-version: "3"
-
-tasks:
-  image:
-    cmds:
-      - docker build -t {{.REGISTRY}}/vge.dev:latest .
-  publish:
-    cmds:
-      - docker push {{.REGISTRY}}/vge.dev:latest
