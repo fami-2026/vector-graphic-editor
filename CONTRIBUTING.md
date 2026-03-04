@@ -2,6 +2,8 @@
 
 Этот документ описывает правила работы с репозиторием и процесс разработки.
 
+[![dev](https://github.com/fami-2026/vector-graphic-editor/actions/workflows/dev.yaml/badge.svg)](https://github.com/fami-2026/vector-graphic-editor/actions/workflows/dev.yaml)
+
 ---
 
 ## 1. Общие принципы
