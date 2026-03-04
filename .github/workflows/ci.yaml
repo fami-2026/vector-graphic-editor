@@ -17,6 +17,9 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Add Safe Directory
+        run: git config --global --add safe.directory /__w/vector-graphic-editor/vector-graphic-editor
 
       - name: Install Dependencies
         run: task client:ci
