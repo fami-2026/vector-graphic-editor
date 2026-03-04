@@ -14,10 +14,12 @@ tasks:
     cmds:
       - npm ci
   ci:build:
+    env:
+      BASE: /vector-graphic-editor/
     deps:
       - ci
     cmds:
-      - npm run build
+      - npm run build-ci
   ci:format:
     deps:
       - ci

@@ -9,6 +9,8 @@ jobs:
     runs-on: nstu
     container:
       image: ghcr.io/fami-2026/vge.dev:latest
+    environment:
+      name: cloud
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -28,6 +30,9 @@ jobs:
       
       - name: Deploy
         run: task deploy
+        env:
+          MONGO_USER: ${{ secrets.MONGO_USER }}
+          MONGO_PASS: ${{ secrets.MONGO_PASS }}
 
   pages-build:
     runs-on: ubuntu-latest
@@ -39,6 +44,8 @@ jobs:
       
       - name: Build Static
         run: task client:ci:build
+        env:
+          ENV: production
 
       - name: Upload
         id: deployment
