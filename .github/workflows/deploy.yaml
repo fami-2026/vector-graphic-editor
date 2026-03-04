@@ -1,0 +1,60 @@
+name: deploy
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+jobs:
+  cloud:
+    runs-on: nstu
+    container:
+      image: ghcr.io/fami-2026/vge.dev:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Login
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io/fami-2026
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Images
+        run: task image
+
+      - name: Publish
+        run: task publish
+      
+      - name: Deploy
+        run: task deploy
+
+  pages-build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/fami-2026/vge.dev:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      
+      - name: Build Static
+        run: task client:ci:build
+
+      - name: Upload
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist/
+
+  pages-deploy:
+    needs: pages-build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        uses: actions/deploy-pages@v4

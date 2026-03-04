@@ -1,0 +1,11 @@
+networks:
+  vge:
+    external: true
+
+services:
+  frontend:
+    image: ghcr.io/fami-2026/vge.client:latest
+    ports:
+      - "5000:3000"
+    networks:
+      - vge

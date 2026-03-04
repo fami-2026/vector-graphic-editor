@@ -1,37 +1,7 @@
 networks:
   vge:
-    driver: bridge
+    external: true
 
-services:
-  mongo:
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: vge
-      MONGO_INITDB_ROOT_USERNAME: $MONGO_USER
-      MONGO_INITDB_ROOT_PASSWORD: $MONGO_PASS
-    networks:
-      - vge
-
-  server:
-    image: ghcr.io/fami-2026/vge.server:latest
-    ports:
-      - "8080:8080"
-    environment:
-      SERVER_PORT: 8080
-      SERVER_SERVLET_CONTEXT_PATH: /api
-      SPRING_MONGODB_HOST: mongo
-      SPRING_MONGODB_PORT: 27017
-      SPRING_MONGODB_DATABASE: vge
-      SPRING_MONGODB_USERNAME: $MONGO_USER
-      SPRING_MONGODB_PASSWORD: $MONGO_PASS
-    networks:
-      - vge
-
-  frontend:
-    image: ghcr.io/fami-2026/vge.client:latest
-    ports:
-      - "5000:3000"
-    networks:
-      - vge
+include:
+  - path: server/compose.yaml
+  - path: frontend/compose.yaml

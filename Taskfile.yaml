@@ -12,10 +12,18 @@ includes:
     dir: ./frontend
 
 tasks:
-  build:
+  image:
     cmds:
       - task: server:image
       - task: client:image
+  publish:
+    cmds:
+      - task: server:publish
+      - task: client:publish
+  setup:
+    cmds:
+      - docker network create vge || true
   deploy:
     cmds:
+      - task: setup
       - docker compose up -d

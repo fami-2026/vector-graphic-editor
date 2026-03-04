@@ -4,12 +4,27 @@ tasks:
   image:
     cmds:
       - docker build -t {{.REGISTRY}}/vge.client:latest .
+  publish:
+    cmds:
+      - docker push {{.REGISTRY}}/vge.client:latest
+  deploy:
+    cmds:
+      - docker compose up -d
   ci:
     cmds:
       - npm ci
+  ci:build:
+    deps:
+      - ci
+    cmds:
+      - npm run build
   ci:format:
+    deps:
+      - ci
     cmds:
       - npm run format
   ci:lint:
+    deps:
+      - ci
     cmds:
       - npm run lint
