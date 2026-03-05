@@ -1,115 +1,135 @@
-git <template>
-  <div class="wrap" aria-label="Zoom and history">
+git
+<template>
+    <div class="wrap" aria-label="Zoom and history">
+        <div class="zoomPill" role="group" aria-label="Zoom controls">
+            <button
+                class="iconBtn"
+                type="button"
+                title="Уменьшить"
+                @click="zoomOut"
+            >
+                <Minus :size="16" aria-hidden="true" />
+            </button>
 
-    <div class="zoomPill" role="group" aria-label="Zoom controls">
-      <button class="iconBtn" type="button" title="Уменьшить" @click="zoomOut">
-        <Minus :size="16" aria-hidden="true" />
-      </button>
+            <div class="zoomValue" aria-label="Zoom value">{{ zoom }}%</div>
 
-      <div class="zoomValue" aria-label="Zoom value">{{ zoom }}%</div>
+            <button
+                class="iconBtn"
+                type="button"
+                title="Увеличить"
+                @click="zoomIn"
+            >
+                <Plus :size="16" aria-hidden="true" />
+            </button>
+        </div>
 
-      <button class="iconBtn" type="button" title="Увеличить" @click="zoomIn">
-        <Plus :size="16" aria-hidden="true" />
-      </button>
+        <div class="history" role="group" aria-label="History controls">
+            <button
+                class="iconBtn square"
+                type="button"
+                title="Отменить"
+                @click="onUndo"
+            >
+                <Undo2 :size="16" aria-hidden="true" />
+            </button>
+            <button
+                class="iconBtn square"
+                type="button"
+                title="Повторить"
+                @click="onRedo"
+            >
+                <Redo2 :size="16" aria-hidden="true" />
+            </button>
+        </div>
     </div>
-
-    <div class="history" role="group" aria-label="History controls">
-      <button class="iconBtn square" type="button" title="Отменить" @click="onUndo">
-        <Undo2 :size="16" aria-hidden="true" />
-      </button>
-      <button class="iconBtn square" type="button" title="Повторить" @click="onRedo">
-        <Redo2 :size="16" aria-hidden="true" />
-      </button>
-    </div>
-  </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Minus, Plus, Undo2, Redo2 } from 'lucide-vue-next'
+import { ref } from 'vue';
+import { Minus, Plus, Undo2, Redo2 } from 'lucide-vue-next';
 
-const zoom = ref(60)
+const zoom = ref(60);
 
 function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n))
+    return Math.max(min, Math.min(max, n));
 }
 
 function zoomIn() {
-  zoom.value = clamp(zoom.value + 10, 10, 500)
+    zoom.value = clamp(zoom.value + 10, 10, 500);
 }
 
 function zoomOut() {
-  zoom.value = clamp(zoom.value - 10, 10, 500)
+    zoom.value = clamp(zoom.value - 10, 10, 500);
 }
 
 function onUndo() {
-  // пока undo/redo не реализованы в store, просто заглушка
-  console.log('undo click')
+    // пока undo/redo не реализованы в store, просто заглушка
+    console.log('undo click');
 }
 
 function onRedo() {
-  console.log('redo click')
+    console.log('redo click');
 }
 </script>
 
 <style scoped>
 .wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .zoomPill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
 
-  padding: 6px 8px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
+    padding: 6px 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
 }
 
 .zoomValue {
-  min-width: 44px;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: #374151;
+    min-width: 44px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
 }
 
 .iconBtn {
-  width: 30px;
-  height: 30px;
+    width: 30px;
+    height: 30px;
 
-  display: grid;
-  place-items: center;
+    display: grid;
+    place-items: center;
 
-  border: 1px solid transparent;
-  border-radius: 999px;
+    border: 1px solid transparent;
+    border-radius: 999px;
 
-  background: #ffffff;
-  cursor: pointer;
-  color: #111827;
+    background: #ffffff;
+    cursor: pointer;
+    color: #111827;
 }
 
 .iconBtn:hover {
-  background: #f3f4f6;
+    background: #f3f4f6;
 }
 
 .iconBtn:active {
-  transform: translateY(1px);
+    transform: translateY(1px);
 }
 
 .iconBtn.square {
-  border-radius: 10px;
-  border-color: #e5e7eb;
+    border-radius: 10px;
+    border-color: #e5e7eb;
 }
 
 .history {
-  display: flex;
-  gap: 8px;
+    display: flex;
+    gap: 8px;
 }
 </style>

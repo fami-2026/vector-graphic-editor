@@ -1,12 +1,30 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
 
-* { box-sizing: border-box; }
-html, body, #app { height: 100%; margin: 0; }
-body {
-  font-family: "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+* {
+    box-sizing: border-box;
 }
-button { font: inherit; }
+html,
+body,
+#app {
+    height: 100%;
+    margin: 0;
+}
+body {
+    font-family:
+        'Montserrat',
+        system-ui,
+        -apple-system,
+        Segoe UI,
+        Roboto,
+        Arial,
+        sans-serif;
+}
+button {
+    font: inherit;
+}
 
-html, body, #app {
-  font-family: "Montserrat", sans-serif;
+html,
+body,
+#app {
+    font-family: 'Montserrat', sans-serif;
 }
