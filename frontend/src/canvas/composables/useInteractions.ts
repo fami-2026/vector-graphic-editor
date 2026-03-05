@@ -249,6 +249,7 @@ export function useInteractions(
 
         if (isResizing.value && activeShape.value && resizeHandle.value) {
             const handle = resizeHandle.value;
+            const shift = e.shiftKey;
 
             // 1. Поворот
             if (handle === 'rot') {
@@ -320,10 +321,65 @@ export function useInteractions(
             let nMinY = startBox.minY,
                 nMaxY = startBox.maxY;
 
-            if (handle.includes('l')) nMinX = localMouse.x;
-            if (handle.includes('r')) nMaxX = localMouse.x;
-            if (handle.includes('t')) nMinY = localMouse.y;
-            if (handle.includes('b')) nMaxY = localMouse.y;
+            if (shift && ['lt', 'rt', 'lb', 'rb'].includes(handle)) {
+                // пропорциональное изменение
+                const origW = startBox.maxX - startBox.minX;
+                const origH = startBox.maxY - startBox.minY;
+
+                // координаты опорного (фиксированного) угла
+                const fixedX = handle.includes('l')
+                    ? startBox.maxX
+                    : startBox.minX;
+                const fixedY = handle.includes('t')
+                    ? startBox.maxY
+                    : startBox.minY;
+
+                // начальная позиция двигаемого угла (до смещения)
+                const startHandleX = handle.includes('l')
+                    ? startBox.minX
+                    : startBox.maxX;
+                const startHandleY = handle.includes('t')
+                    ? startBox.minY
+                    : startBox.maxY;
+
+                const dirX = handle.includes('l') ? -1 : 1;
+                const dirY = handle.includes('t') ? -1 : 1;
+
+                const deltaX = localMouse.x - startHandleX;
+                const deltaY = localMouse.y - startHandleY;
+                const effX = deltaX * dirX;
+                const effY = deltaY * dirY;
+
+                // коэффициент масштабирования, ==1 при отсутствии движения
+                const kx = origW ? 1 + effX / origW : 1;
+                const ky = origH ? 1 + effY / origH : 1;
+                let k = Math.max(Math.abs(kx), Math.abs(ky));
+                k = Math.max(k, 0.01); // не допускать нулевого размера
+
+                const newW = origW * k;
+                const newH = origH * k;
+
+                if (handle.includes('l')) {
+                    nMinX = fixedX - newW;
+                    nMaxX = fixedX;
+                } else {
+                    nMinX = fixedX;
+                    nMaxX = fixedX + newW;
+                }
+
+                if (handle.includes('t')) {
+                    nMinY = fixedY - newH;
+                    nMaxY = fixedY;
+                } else {
+                    nMinY = fixedY;
+                    nMaxY = fixedY + newH;
+                }
+            } else {
+                if (handle.includes('l')) nMinX = localMouse.x;
+                if (handle.includes('r')) nMaxX = localMouse.x;
+                if (handle.includes('t')) nMinY = localMouse.y;
+                if (handle.includes('b')) nMaxY = localMouse.y;
+            }
 
             const newWidth = Math.abs(nMaxX - nMinX);
             const newHeight = Math.abs(nMaxY - nMinY);
