@@ -10,14 +10,27 @@ const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 const canvasStore = useCanvasStore();
-const { shapes, selectedId, curveDrawing, showCurveDialog, tempCurve } = storeToRefs(canvasStore);
+const { shapes, selectedId, showCurveDialog, tempCurve } = storeToRefs(canvasStore);
 
 const { draw } = useCanvasRender(canvasRef, shapes, selectedId);
 const { attachListeners } = useInteractions(canvasRef, shapes);
 
 let resizeObserver: ResizeObserver | null = null;
 let detachListeners: (() => void) | undefined;
-
+interface CurveShapeData {
+    id: string;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    cp1X: number;
+    cp1Y: number;
+    cp2X: number;
+    cp2Y: number;
+    stroke: string;
+    strokeWidth: number;
+    bendCount?: number;
+}
 const updateCanvasSize = () => {
     if (!containerRef.value || !canvasRef.value) return;
 
@@ -55,7 +68,8 @@ const handleCanvasDoubleClick = (e: MouseEvent) => {
     
     for (const shape of canvasStore.shapes) {
         if (shape.type === 'curve' && shape.hitTest({ x, y })) {
-            const s = shape as any;
+            const s = shape as unknown as CurveShapeData;
+            
             const editableCurve = {
                 id: s.id,
                 startX: s.startX,
@@ -70,11 +84,11 @@ const handleCanvasDoubleClick = (e: MouseEvent) => {
                 strokeWidth: s.strokeWidth,
                 bendCount: s.bendCount || 0
             };
+            
             canvasStore.editCurve(editableCurve);
             break;
         }
     }
-
 };
 
 onMounted(() => {

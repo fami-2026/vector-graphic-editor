@@ -38,10 +38,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: 'update:show', value: boolean): void;
+    (e: 'update:curve', value: EditableCurve): void;
     (e: 'confirm'): void;
     (e: 'cancel'): void;
 }>();
 
+// Локальная копия кривой для редактирования
+const localCurve = ref<EditableCurve | null>(null);
 const bendCount = ref(0);
 const isDragging = ref(false);
 const svgRef = ref<SVGSVGElement | null>(null);
@@ -54,13 +57,13 @@ const lastMousePos = ref<{ x: number, y: number } | null>(null);
 const isLocked = ref(false);
 
 function saveState() {
-    if (!props.curve) return;
+    if (!localCurve.value) return;
     
     const state: CurveState = {
-        cp1X: props.curve.cp1X,
-        cp1Y: props.curve.cp1Y,
-        cp2X: props.curve.cp2X,
-        cp2Y: props.curve.cp2Y,
+        cp1X: localCurve.value.cp1X,
+        cp1Y: localCurve.value.cp1Y,
+        cp2X: localCurve.value.cp2X,
+        cp2Y: localCurve.value.cp2Y,
         bendCount: bendCount.value
     };
     
@@ -73,25 +76,27 @@ function saveState() {
 }
 
 function undo() {
-    if (currentHistoryIndex.value > 0 && props.curve) {
+    if (currentHistoryIndex.value > 0 && localCurve.value) {
         currentHistoryIndex.value--;
         const state = history.value[currentHistoryIndex.value];
         
         if (state) {
-            props.curve.cp1X = state.cp1X;
-            props.curve.cp1Y = state.cp1Y;
-            props.curve.cp2X = state.cp2X;
-            props.curve.cp2Y = state.cp2Y;
+            localCurve.value.cp1X = state.cp1X;
+            localCurve.value.cp1Y = state.cp1Y;
+            localCurve.value.cp2X = state.cp2X;
+            localCurve.value.cp2Y = state.cp2Y;
             bendCount.value = state.bendCount;
-            props.curve.bendCount = state.bendCount;
+            localCurve.value.bendCount = state.bendCount;
             
             isLocked.value = bendCount.value >= 2;
         }
     }
 }
 
+// Копируем пропс в локальную переменную
 watch(() => props.curve, (newCurve) => {
     if (newCurve) {
+        localCurve.value = JSON.parse(JSON.stringify(newCurve));
         bendCount.value = newCurve.bendCount || 0;
         isLocked.value = bendCount.value >= 2;
         
@@ -103,25 +108,27 @@ watch(() => props.curve, (newCurve) => {
             bendCount: bendCount.value
         }];
         currentHistoryIndex.value = 0;
+    } else {
+        localCurve.value = null;
     }
 }, { immediate: true });
 
 function getPointOnCurve(t: number): { x: number, y: number } {
-    if (!props.curve) return { x: 0, y: 0 };
+    if (!localCurve.value) return { x: 0, y: 0 };
     
     const x = cubicBezier(
-        props.curve.startX, 
-        props.curve.cp1X, 
-        props.curve.cp2X, 
-        props.curve.endX, 
+        localCurve.value.startX, 
+        localCurve.value.cp1X, 
+        localCurve.value.cp2X, 
+        localCurve.value.endX, 
         t
     );
     
     const y = cubicBezier(
-        props.curve.startY, 
-        props.curve.cp1Y, 
-        props.curve.cp2Y, 
-        props.curve.endY, 
+        localCurve.value.startY, 
+        localCurve.value.cp1Y, 
+        localCurve.value.cp2Y, 
+        localCurve.value.endY, 
         t
     );
     
@@ -140,7 +147,7 @@ function bezierDerivative(p0: number, p1: number, p2: number, p3: number, t: num
 }
 
 function startDrag(event: MouseEvent) {
-    if (!props.curve || !svgRef.value || isLocked.value) return;
+    if (!localCurve.value || !svgRef.value || isLocked.value) return;
     
     event.preventDefault();
     
@@ -181,7 +188,7 @@ function startDrag(event: MouseEvent) {
 }
 
 function onDrag(event: MouseEvent) {
-    if (!isDragging.value || dragT.value === null || !props.curve || !svgRef.value || !lastMousePos.value || isLocked.value) return;
+    if (!isDragging.value || dragT.value === null || !localCurve.value || !svgRef.value || !lastMousePos.value || isLocked.value) return;
     
     const svg = svgRef.value;
     const pt = svg.createSVGPoint();
@@ -198,8 +205,8 @@ function onDrag(event: MouseEvent) {
     
     const t = dragT.value;
     
-    const dx = bezierDerivative(props.curve.startX, props.curve.cp1X, props.curve.cp2X, props.curve.endX, t);
-    const dy = bezierDerivative(props.curve.startY, props.curve.cp1Y, props.curve.cp2Y, props.curve.endY, t);
+    const dx = bezierDerivative(localCurve.value.startX, localCurve.value.cp1X, localCurve.value.cp2X, localCurve.value.endX, t);
+    const dy = bezierDerivative(localCurve.value.startY, localCurve.value.cp1Y, localCurve.value.cp2Y, localCurve.value.endY, t);
     const len = Math.sqrt(dx * dx + dy * dy);
     
     const nx = len > 0 ? dx / len : 1;
@@ -213,22 +220,22 @@ function onDrag(event: MouseEvent) {
     const influence1 = 1 - t;
     const influence2 = t;
     
-    props.curve.cp1X += dot * normX * influence1 * 1.5;
-    props.curve.cp1Y += dot * normY * influence1 * 1.5;
-    props.curve.cp2X += dot * normX * influence2 * 1.5;
-    props.curve.cp2Y += dot * normY * influence2 * 1.5;
+    localCurve.value.cp1X += dot * normX * influence1 * 1.5;
+    localCurve.value.cp1Y += dot * normY * influence1 * 1.5;
+    localCurve.value.cp2X += dot * normX * influence2 * 1.5;
+    localCurve.value.cp2Y += dot * normY * influence2 * 1.5;
     
     lastMousePos.value = { x: currentX, y: currentY };
 }
 
 function stopDrag() {
-    if (isDragging.value && props.curve && !isLocked.value) {
+    if (isDragging.value && localCurve.value && !isLocked.value) {
         saveState();
         
         const newBendCount = bendCount.value + 1;
         if (newBendCount <= 2) {
             bendCount.value = newBendCount;
-            props.curve.bendCount = newBendCount;
+            localCurve.value.bendCount = newBendCount;
             
             if (newBendCount >= 2) {
                 isLocked.value = true;
@@ -242,27 +249,27 @@ function stopDrag() {
 }
 
 function addBend() {
-    if (!props.curve || bendCount.value >= 2) return;
+    if (!localCurve.value || bendCount.value >= 2) return;
     
     saveState();
     
-    const midX = (props.curve.startX + props.curve.endX) / 2;
-    const midY = (props.curve.startY + props.curve.endY) / 2;
+    const midX = (localCurve.value.startX + localCurve.value.endX) / 2;
+    const midY = (localCurve.value.startY + localCurve.value.endY) / 2;
     
     if (bendCount.value === 0) {
-        props.curve.cp1X = midX;
-        props.curve.cp1Y = midY;
-        const dx = props.curve.endX - props.curve.startX;
-        const dy = props.curve.endY - props.curve.startY;
-        props.curve.cp2X = props.curve.startX + 2 * dx / 3;
-        props.curve.cp2Y = props.curve.startY + 2 * dy / 3;
+        localCurve.value.cp1X = midX;
+        localCurve.value.cp1Y = midY;
+        const dx = localCurve.value.endX - localCurve.value.startX;
+        const dy = localCurve.value.endY - localCurve.value.startY;
+        localCurve.value.cp2X = localCurve.value.startX + 2 * dx / 3;
+        localCurve.value.cp2Y = localCurve.value.startY + 2 * dy / 3;
     } else if (bendCount.value === 1) {
-        props.curve.cp2X = midX;
-        props.curve.cp2Y = midY;
+        localCurve.value.cp2X = midX;
+        localCurve.value.cp2Y = midY;
     }
     
     bendCount.value++;
-    props.curve.bendCount = bendCount.value;
+    localCurve.value.bendCount = bendCount.value;
     
     if (bendCount.value >= 2) {
         isLocked.value = true;
@@ -270,6 +277,9 @@ function addBend() {
 }
 
 function confirm() {
+    if (localCurve.value) {
+        emit('update:curve', localCurve.value);
+    }
     emit('confirm');
 }
 
@@ -278,9 +288,9 @@ function cancel() {
 }
 
 function getCurvePath(): string {
-    if (!props.curve) return '';
+    if (!localCurve.value) return '';
     
-    return `M ${props.curve.startX} ${props.curve.startY} C ${props.curve.cp1X} ${props.curve.cp1Y}, ${props.curve.cp2X} ${props.curve.cp2Y}, ${props.curve.endX} ${props.curve.endY}`;
+    return `M ${localCurve.value.startX} ${localCurve.value.startY} C ${localCurve.value.cp1X} ${localCurve.value.cp1Y}, ${localCurve.value.cp2X} ${localCurve.value.cp2Y}, ${localCurve.value.endX} ${localCurve.value.endY}`;
 }
 </script>
 
