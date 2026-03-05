@@ -6,7 +6,7 @@ import { generateId } from '@/canvas/utils/math';
 import { PolygonShape } from '@/canvas/types/polygon/polygon';
 import { CurveShape } from '@/canvas/types/curve/curve';
 
-// Интерфейс для временной кривой (редактируемой)
+// Интерфейс для временной кривой
 interface EditableCurve {
     id?: string;
     startX: number;
@@ -30,7 +30,7 @@ interface EditableCurve {
 }
 
 // Интерфейс для параметров фигур
-interface ShapeParams {
+interface ShapeParams extends Record<string, unknown> {
     sides?: number;
     width?: number;
     height?: number;
@@ -130,18 +130,25 @@ export const useCanvasStore = defineStore('canvas', () => {
             
             if (isEditingExisting.value && editingCurveId.value) {
                 const index = shapes.value.findIndex(s => s.id === editingCurveId.value);
-                if (index !== -1) {
+                if (index !== -1 && 
+                    c.originalStartX !== undefined && 
+                    c.originalStartY !== undefined && 
+                    c.originalEndX !== undefined && 
+                    c.originalEndY !== undefined &&
+                    c.offsetX !== undefined && 
+                    c.offsetY !== undefined) {
+                    
                     const updatedCurve = new CurveShape(
                         editingCurveId.value,
-                        { x: c.originalStartX!, y: c.originalStartY! },
-                        c.originalStartX!,
-                        c.originalStartY!,
-                        c.originalEndX!,
-                        c.originalEndY!,
-                        c.cp1X - c.offsetX!,
-                        c.cp1Y - c.offsetY!,
-                        c.cp2X - c.offsetX!,
-                        c.cp2Y - c.offsetY!,
+                        { x: c.originalStartX, y: c.originalStartY },
+                        c.originalStartX,
+                        c.originalStartY,
+                        c.originalEndX,
+                        c.originalEndY,
+                        c.cp1X - c.offsetX,
+                        c.cp1Y - c.offsetY,
+                        c.cp2X - c.offsetX,
+                        c.cp2Y - c.offsetY,
                         c.stroke,
                         c.strokeOpacity,
                         c.strokeWidth
@@ -150,18 +157,25 @@ export const useCanvasStore = defineStore('canvas', () => {
                     updatedCurve.bendCount = c.bendCount;
                     shapes.value.splice(index, 1, updatedCurve);
                 }
-            } else {
+            } else if (
+                c.originalStartX !== undefined && 
+                c.originalStartY !== undefined && 
+                c.originalEndX !== undefined && 
+                c.originalEndY !== undefined &&
+                c.offsetX !== undefined && 
+                c.offsetY !== undefined) {
+                
                 const curve = new CurveShape(
                     generateId(),
-                    { x: c.originalStartX!, y: c.originalStartY! },
-                    c.originalStartX!,
-                    c.originalStartY!,
-                    c.originalEndX!,
-                    c.originalEndY!,
-                    c.cp1X - c.offsetX!,
-                    c.cp1Y - c.offsetY!,
-                    c.cp2X - c.offsetX!,
-                    c.cp2Y - c.offsetY!,
+                    { x: c.originalStartX, y: c.originalStartY },
+                    c.originalStartX,
+                    c.originalStartY,
+                    c.originalEndX,
+                    c.originalEndY,
+                    c.cp1X - c.offsetX,
+                    c.cp1Y - c.offsetY,
+                    c.cp2X - c.offsetX,
+                    c.cp2Y - c.offsetY,
                     c.stroke,
                     c.strokeOpacity,
                     c.strokeWidth
@@ -277,7 +291,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     function selectShape(id: string | null) {
         selectedId.value = id;
     }
-    
+
     return {
         shapes,
         selectedId,

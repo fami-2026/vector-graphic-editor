@@ -93,7 +93,12 @@ function handleToolClick(tool: ToolConfig) {
     }
 }
 
-function addShape(type: ShapeType, customParams?: Record<string, unknown>) {
+interface ShapeParams {
+    sides?: number;
+    [key: string]: unknown; 
+}
+
+function addShape(type: ShapeType, customParams?: ShapeParams) {
     canvasStore.addShape(type, { x: 400, y: 300 }, customParams);
     toolsStore.setActiveTool('select');
 }

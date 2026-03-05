@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 
-// Определяем тип прямо здесь
 interface EditableCurve {
     id?: string;
     startX: number;
@@ -13,6 +12,7 @@ interface EditableCurve {
     cp2X: number;
     cp2Y: number;
     stroke: string;
+    strokeOpacity: number;
     strokeWidth: number;
     bendCount: number;
     originalStartX?: number;
@@ -23,6 +23,14 @@ interface EditableCurve {
     offsetY?: number;
 }
 
+interface CurveState {
+    cp1X: number;
+    cp1Y: number;
+    cp2X: number;
+    cp2Y: number;
+    bendCount: number;
+}
+
 const props = defineProps<{
     show: boolean;
     curve: EditableCurve | null;
@@ -30,94 +38,90 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     (e: 'update:show', value: boolean): void;
-    (e: 'update:curve', value: EditableCurve | null): void;
     (e: 'confirm'): void;
     (e: 'cancel'): void;
 }>();
 
-type PointType = 'start' | 'end' | 'control';
-
-interface DisplayPoint {
-    x: number;
-    y: number;
-    type: PointType;
-    index: number;
-}
-
 const bendCount = ref(0);
 const isDragging = ref(false);
 const svgRef = ref<SVGSVGElement | null>(null);
+
+const history = ref<CurveState[]>([]);
+const currentHistoryIndex = ref(-1);
+
 const dragT = ref<number | null>(null);
 const lastMousePos = ref<{ x: number, y: number } | null>(null);
+const isLocked = ref(false);
 
-// Локальная копия кривой для редактирования
-const localCurve = ref<EditableCurve | null>(null);
+function saveState() {
+    if (!props.curve) return;
+    
+    const state: CurveState = {
+        cp1X: props.curve.cp1X,
+        cp1Y: props.curve.cp1Y,
+        cp2X: props.curve.cp2X,
+        cp2Y: props.curve.cp2Y,
+        bendCount: bendCount.value
+    };
+    
+    if (currentHistoryIndex.value < history.value.length - 1) {
+        history.value = history.value.slice(0, currentHistoryIndex.value + 1);
+    }
+    
+    history.value.push(state);
+    currentHistoryIndex.value = history.value.length - 1;
+}
 
-// Точки для отображения
-const previewPoints = ref<DisplayPoint[]>([]);
+function undo() {
+    if (currentHistoryIndex.value > 0 && props.curve) {
+        currentHistoryIndex.value--;
+        const state = history.value[currentHistoryIndex.value];
+        
+        if (state) {
+            props.curve.cp1X = state.cp1X;
+            props.curve.cp1Y = state.cp1Y;
+            props.curve.cp2X = state.cp2X;
+            props.curve.cp2Y = state.cp2Y;
+            bendCount.value = state.bendCount;
+            props.curve.bendCount = state.bendCount;
+            
+            isLocked.value = bendCount.value >= 2;
+        }
+    }
+}
 
 watch(() => props.curve, (newCurve) => {
     if (newCurve) {
-        // Создаем глубокую копию
-        localCurve.value = JSON.parse(JSON.stringify(newCurve));
         bendCount.value = newCurve.bendCount || 0;
-        updatePointsFromCurve();
-    } else {
-        localCurve.value = null;
+        isLocked.value = bendCount.value >= 2;
+        
+        history.value = [{
+            cp1X: newCurve.cp1X,
+            cp1Y: newCurve.cp1Y,
+            cp2X: newCurve.cp2X,
+            cp2Y: newCurve.cp2Y,
+            bendCount: bendCount.value
+        }];
+        currentHistoryIndex.value = 0;
     }
 }, { immediate: true });
 
-function updatePointsFromCurve() {
-    if (!localCurve.value) return;
-    
-    const points: DisplayPoint[] = [];
-    points.push({ 
-        x: localCurve.value.startX, 
-        y: localCurve.value.startY, 
-        type: 'start',
-        index: 0 
-    });
-    
-    points.push({ 
-        x: localCurve.value.endX, 
-        y: localCurve.value.endY, 
-        type: 'end',
-        index: 1 
-    });
-    
-    points.push({ 
-        x: localCurve.value.cp1X, 
-        y: localCurve.value.cp1Y, 
-        type: 'control',
-        index: 2 
-    });
-    
-    points.push({ 
-        x: localCurve.value.cp2X, 
-        y: localCurve.value.cp2Y, 
-        type: 'control',
-        index: 3 
-    });
-    
-    previewPoints.value = points;
-}
-
 function getPointOnCurve(t: number): { x: number, y: number } {
-    if (!localCurve.value) return { x: 0, y: 0 };
+    if (!props.curve) return { x: 0, y: 0 };
     
     const x = cubicBezier(
-        localCurve.value.startX, 
-        localCurve.value.cp1X, 
-        localCurve.value.cp2X, 
-        localCurve.value.endX, 
+        props.curve.startX, 
+        props.curve.cp1X, 
+        props.curve.cp2X, 
+        props.curve.endX, 
         t
     );
     
     const y = cubicBezier(
-        localCurve.value.startY, 
-        localCurve.value.cp1Y, 
-        localCurve.value.cp2Y, 
-        localCurve.value.endY, 
+        props.curve.startY, 
+        props.curve.cp1Y, 
+        props.curve.cp2Y, 
+        props.curve.endY, 
         t
     );
     
@@ -136,7 +140,7 @@ function bezierDerivative(p0: number, p1: number, p2: number, p3: number, t: num
 }
 
 function startDrag(event: MouseEvent) {
-    if (!localCurve.value || !svgRef.value) return;
+    if (!props.curve || !svgRef.value || isLocked.value) return;
     
     event.preventDefault();
     
@@ -177,7 +181,7 @@ function startDrag(event: MouseEvent) {
 }
 
 function onDrag(event: MouseEvent) {
-    if (!isDragging.value || dragT.value === null || !localCurve.value || !svgRef.value || !lastMousePos.value) return;
+    if (!isDragging.value || dragT.value === null || !props.curve || !svgRef.value || !lastMousePos.value || isLocked.value) return;
     
     const svg = svgRef.value;
     const pt = svg.createSVGPoint();
@@ -194,8 +198,8 @@ function onDrag(event: MouseEvent) {
     
     const t = dragT.value;
     
-    const dx = bezierDerivative(localCurve.value.startX, localCurve.value.cp1X, localCurve.value.cp2X, localCurve.value.endX, t);
-    const dy = bezierDerivative(localCurve.value.startY, localCurve.value.cp1Y, localCurve.value.cp2Y, localCurve.value.endY, t);
+    const dx = bezierDerivative(props.curve.startX, props.curve.cp1X, props.curve.cp2X, props.curve.endX, t);
+    const dy = bezierDerivative(props.curve.startY, props.curve.cp1Y, props.curve.cp2Y, props.curve.endY, t);
     const len = Math.sqrt(dx * dx + dy * dy);
     
     const nx = len > 0 ? dx / len : 1;
@@ -209,92 +213,63 @@ function onDrag(event: MouseEvent) {
     const influence1 = 1 - t;
     const influence2 = t;
     
-    localCurve.value.cp1X += dot * normX * influence1 * 1.5;
-    localCurve.value.cp1Y += dot * normY * influence1 * 1.5;
-    localCurve.value.cp2X += dot * normX * influence2 * 1.5;
-    localCurve.value.cp2Y += dot * normY * influence2 * 1.5;
+    props.curve.cp1X += dot * normX * influence1 * 1.5;
+    props.curve.cp1Y += dot * normY * influence1 * 1.5;
+    props.curve.cp2X += dot * normX * influence2 * 1.5;
+    props.curve.cp2Y += dot * normY * influence2 * 1.5;
     
     lastMousePos.value = { x: currentX, y: currentY };
-    
-    updateBendCount();
-    updatePointsFromCurve();
 }
 
 function stopDrag() {
+    if (isDragging.value && props.curve && !isLocked.value) {
+        saveState();
+        
+        const newBendCount = bendCount.value + 1;
+        if (newBendCount <= 2) {
+            bendCount.value = newBendCount;
+            props.curve.bendCount = newBendCount;
+            
+            if (newBendCount >= 2) {
+                isLocked.value = true;
+            }
+        }
+    }
+    
     isDragging.value = false;
     dragT.value = null;
     lastMousePos.value = null;
 }
 
-function updateBendCount() {
-    if (!localCurve.value) return;
-    
-    const dx = localCurve.value.endX - localCurve.value.startX;
-    const dy = localCurve.value.endY - localCurve.value.startY;
-    
-    const straightC1X = localCurve.value.startX + dx / 3;
-    const straightC1Y = localCurve.value.startY + dy / 3;
-    const dist1 = Math.sqrt(
-        Math.pow(localCurve.value.cp1X - straightC1X, 2) + 
-        Math.pow(localCurve.value.cp1Y - straightC1Y, 2)
-    );
-    
-    const straightC2X = localCurve.value.startX + 2 * dx / 3;
-    const straightC2Y = localCurve.value.startY + 2 * dy / 3;
-    const dist2 = Math.sqrt(
-        Math.pow(localCurve.value.cp2X - straightC2X, 2) + 
-        Math.pow(localCurve.value.cp2Y - straightC2Y, 2)
-    );
-    
-    let count = 0;
-    if (dist1 > 5) count++;
-    if (dist2 > 5) count++;
-    
-    localCurve.value.bendCount = count;
-    bendCount.value = count;
-}
-
 function addBend() {
-    if (!localCurve.value || bendCount.value >= 2) return;
+    if (!props.curve || bendCount.value >= 2) return;
     
-    const midX = (localCurve.value.startX + localCurve.value.endX) / 2;
-    const midY = (localCurve.value.startY + localCurve.value.endY) / 2;
+    saveState();
+    
+    const midX = (props.curve.startX + props.curve.endX) / 2;
+    const midY = (props.curve.startY + props.curve.endY) / 2;
     
     if (bendCount.value === 0) {
-        localCurve.value.cp1X = midX;
-        localCurve.value.cp1Y = midY;
-    } else {
-        localCurve.value.cp2X = midX;
-        localCurve.value.cp2Y = midY;
+        props.curve.cp1X = midX;
+        props.curve.cp1Y = midY;
+        const dx = props.curve.endX - props.curve.startX;
+        const dy = props.curve.endY - props.curve.startY;
+        props.curve.cp2X = props.curve.startX + 2 * dx / 3;
+        props.curve.cp2Y = props.curve.startY + 2 * dy / 3;
+    } else if (bendCount.value === 1) {
+        props.curve.cp2X = midX;
+        props.curve.cp2Y = midY;
     }
     
-    updateBendCount();
-    updatePointsFromCurve();
-}
-
-function removeLastBend() {
-    if (!localCurve.value || bendCount.value === 0) return;
+    bendCount.value++;
+    props.curve.bendCount = bendCount.value;
     
-    if (bendCount.value === 2) {
-        const dx = localCurve.value.endX - localCurve.value.startX;
-        const dy = localCurve.value.endY - localCurve.value.startY;
-        localCurve.value.cp2X = localCurve.value.startX + 2 * dx / 3;
-        localCurve.value.cp2Y = localCurve.value.startY + 2 * dy / 3;
-    } else {
-        const dx = localCurve.value.endX - localCurve.value.startX;
-        const dy = localCurve.value.endY - localCurve.value.startY;
-        localCurve.value.cp1X = localCurve.value.startX + dx / 3;
-        localCurve.value.cp1Y = localCurve.value.startY + dy / 3;
+    if (bendCount.value >= 2) {
+        isLocked.value = true;
     }
-    
-    updateBendCount();
-    updatePointsFromCurve();
 }
 
 function confirm() {
-    if (localCurve.value) {
-        emit('update:curve', localCurve.value);
-    }
     emit('confirm');
 }
 
@@ -303,9 +278,9 @@ function cancel() {
 }
 
 function getCurvePath(): string {
-    if (!localCurve.value) return '';
+    if (!props.curve) return '';
     
-    return `M ${localCurve.value.startX} ${localCurve.value.startY} C ${localCurve.value.cp1X} ${localCurve.value.cp1Y}, ${localCurve.value.cp2X} ${localCurve.value.cp2Y}, ${localCurve.value.endX} ${localCurve.value.endY}`;
+    return `M ${props.curve.startX} ${props.curve.startY} C ${props.curve.cp1X} ${props.curve.cp1Y}, ${props.curve.cp2X} ${props.curve.cp2Y}, ${props.curve.endX} ${props.curve.endY}`;
 }
 </script>
 
@@ -319,6 +294,7 @@ function getCurvePath(): string {
                     ref="svgRef"
                     viewBox="0 0 500 300" 
                     class="preview-svg"
+                    :class="{ locked: isLocked }"
                     @mousedown="startDrag"
                     @mousemove="onDrag"
                     @mouseup="stopDrag"
@@ -326,11 +302,11 @@ function getCurvePath(): string {
                 >
                     <path
                         :d="getCurvePath()"
-                        stroke="#2196f3"
+                        :stroke="isLocked ? '#999' : '#2196f3'"
                         stroke-width="12"
                         fill="none"
                         stroke-linecap="round"
-                        opacity="0.6"
+                        :opacity="isLocked ? 0.3 : 0.6"
                     />
                     
                     <path
@@ -342,7 +318,7 @@ function getCurvePath(): string {
                     />
                     
                     <circle
-                        v-if="isDragging && dragT !== null"
+                        v-if="isDragging && dragT !== null && !isLocked"
                         :cx="getPointOnCurve(dragT).x"
                         :cy="getPointOnCurve(dragT).y"
                         r="12"
@@ -355,15 +331,16 @@ function getCurvePath(): string {
             
             <div class="info">
                 <p>Изгибов: {{ bendCount }}/2</p>
+                <p v-if="isLocked" class="warning">Достигнут лимит изгибов (2)</p>
                 <p class="hint">* Нажмите и перетащите любую точку на кривой, чтобы изменить её форму</p>
             </div>
             
             <div class="button-group">
-                <button @click="addBend" :disabled="bendCount >= 2">
-                    Добавить изгиб ({{ 2 - bendCount }} осталось)
+                <button @click="addBend" :disabled="bendCount >= 2 || isLocked">
+                    Добавить изгиб
                 </button>
-                <button @click="removeLastBend" :disabled="bendCount <= 0">
-                    Удалить последний
+                <button @click="undo" :disabled="currentHistoryIndex <= 0" class="undo-btn">
+                    ↩ Отменить
                 </button>
             </div>
             
@@ -392,7 +369,7 @@ function getCurvePath(): string {
 .modal {
     background: white;
     padding: 2rem;
-    border-radius: 12px;
+    border-radius: 8px;
     min-width: 600px;
     max-width: 800px;
 }
@@ -416,6 +393,11 @@ function getCurvePath(): string {
     cursor: grabbing;
 }
 
+.preview-svg.locked {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
 .info {
     text-align: center;
     margin: 1rem 0;
@@ -428,11 +410,19 @@ function getCurvePath(): string {
     margin-top: 0.5rem;
 }
 
+.warning {
+    font-size: 0.9rem;
+    color: #f44336;
+    margin-top: 0.5rem;
+    font-weight: bold;
+}
+
 .button-group {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
     justify-content: center;
     margin: 1rem 0;
+    flex-wrap: wrap;
 }
 
 .button-group button {
@@ -441,6 +431,7 @@ function getCurvePath(): string {
     border-radius: 4px;
     background: white;
     cursor: pointer;
+    font-size: 0.9rem;
 }
 
 .button-group button:hover:not(:disabled) {
@@ -450,6 +441,16 @@ function getCurvePath(): string {
 .button-group button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.undo-btn {
+    background: #ffc107 !important;
+    color: #000 !important;
+    border-color: #ffa000 !important;
+}
+
+.undo-btn:hover:not(:disabled) {
+    background: #ffb300 !important;
 }
 
 .actions {
