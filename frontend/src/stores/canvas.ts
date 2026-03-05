@@ -3,6 +3,20 @@ import { ref, computed } from 'vue';
 import type { Shape } from '@/canvas/types';
 import { shapeRegistry } from '@/canvas/types';
 import { generateId } from '@/canvas/utils/math';
+import { PolygonShape } from '@/canvas/types/polygon/polygon';
+
+interface ShapeParams extends Record<string, unknown> {
+    sides?: number;
+    width?: number;
+    height?: number;
+    radius?: number;
+    fill?: string;
+    fillOpacity?: number;
+    stroke?: string;
+    strokeOpacity?: number;
+    strokeWidth?: number;
+    rotation?: number;
+}
 
 type SerializedShapeBase = {
     type: string;
@@ -20,9 +34,6 @@ type SceneSnapshot = {
     selectedId: string | null;
 };
 
-/**
- * Хранилище состояния сцены: фигуры, выделение, операции и история.
- */
 export const useCanvasStore = defineStore('canvas', () => {
     const shapes = ref<Shape[]>([]);
     const selectedId = ref<string | null>(null);
@@ -129,8 +140,31 @@ export const useCanvasStore = defineStore('canvas', () => {
     const canUndo = computed(() => undoStack.value.length > 0);
     const canRedo = computed(() => redoStack.value.length > 0);
 
-    function addShape(type: string, pos: { x: number; y: number }) {
+    function addShape(
+        type: string,
+        pos: { x: number; y: number },
+        params?: ShapeParams
+    ) {
         pushHistory();
+
+        if (type === 'polygon' && params?.sides) {
+            const shape = new PolygonShape(
+                generateId(),
+                pos,
+                params.sides,
+                100,
+                100,
+                0,
+                'transparent',
+                1,
+                '#000000',
+                1,
+                2
+            );
+            shapes.value.push(shape);
+            return shape;
+        }
+
         const shape = shapeRegistry.create(type, generateId(), pos);
         shapes.value.push(shape);
         return shape;
@@ -160,6 +194,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         ) {
             return;
         }
+
         pushHistory();
         const next = [...shapes.value];
         const [item] = next.splice(fromIndex, 1);

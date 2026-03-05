@@ -1,0 +1,1 @@
+export { StarShape } from './star';
