@@ -330,7 +330,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     const canUndo = computed(() => undoStack.value.length > 0);
     const canRedo = computed(() => redoStack.value.length > 0);
 
-    function addShape(type: string, pos: { x: number; y: number }, params?: ShapeParams) {
+    function addShape(
+        type: string,
+        pos: { x: number; y: number },
+        params?: ShapeParams
+    ) {
         pushHistory();
         if (type === 'polygon' && params?.sides) {
             const shape = new PolygonShape(
