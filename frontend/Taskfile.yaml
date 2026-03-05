@@ -15,10 +15,8 @@ tasks:
     cmds:
       - npm ci
   build:
-    env:
-      BASE: '{{.BASE | default "/"}}'
     cmds:
-      - npm run build-ci
+      - node_modules/.bin/vite build --base={{.BASE | default "/"}}
   format:
     cmds:
       - npm run format
