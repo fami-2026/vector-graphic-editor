@@ -10,7 +10,8 @@ const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 const canvasStore = useCanvasStore();
-const { shapes, selectedId, showCurveDialog, tempCurve } = storeToRefs(canvasStore);
+const { shapes, selectedId, showCurveDialog, tempCurve } =
+    storeToRefs(canvasStore);
 
 const { draw } = useCanvasRender(canvasRef, shapes, selectedId);
 const { attachListeners } = useInteractions(canvasRef, shapes);
@@ -48,11 +49,11 @@ const updateCanvasSize = () => {
 
 const handleCanvasClick = (e: MouseEvent) => {
     if (!canvasRef.value) return;
-    
+
     const rect = canvasRef.value.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     if (canvasStore.curveDrawing) {
         canvasStore.handleCanvasClick(x, y);
         e.stopPropagation();
@@ -61,15 +62,15 @@ const handleCanvasClick = (e: MouseEvent) => {
 
 const handleCanvasDoubleClick = (e: MouseEvent) => {
     if (!canvasRef.value) return;
-    
+
     const rect = canvasRef.value.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     for (const shape of canvasStore.shapes) {
         if (shape.type === 'curve' && shape.hitTest({ x, y })) {
             const s = shape as unknown as CurveShapeData;
-            
+
             const editableCurve = {
                 id: s.id,
                 startX: s.startX,
@@ -82,9 +83,9 @@ const handleCanvasDoubleClick = (e: MouseEvent) => {
                 cp2Y: s.cp2Y,
                 stroke: s.stroke,
                 strokeWidth: s.strokeWidth,
-                bendCount: s.bendCount || 0
+                bendCount: s.bendCount || 0,
             };
-            
+
             canvasStore.editCurve(editableCurve);
             break;
         }
@@ -98,7 +99,7 @@ onMounted(() => {
     }
 
     detachListeners = attachListeners();
-    
+
     if (canvasRef.value) {
         canvasRef.value.addEventListener('click', handleCanvasClick);
         canvasRef.value.addEventListener('dblclick', handleCanvasDoubleClick);
@@ -108,10 +109,13 @@ onMounted(() => {
 onUnmounted(() => {
     resizeObserver?.disconnect();
     detachListeners?.();
-    
+
     if (canvasRef.value) {
         canvasRef.value.removeEventListener('click', handleCanvasClick);
-        canvasRef.value.removeEventListener('dblclick', handleCanvasDoubleClick);
+        canvasRef.value.removeEventListener(
+            'dblclick',
+            handleCanvasDoubleClick
+        );
     }
 });
 
@@ -121,7 +125,7 @@ watch([shapes, selectedId], () => requestAnimationFrame(draw), { deep: true });
 <template>
     <div ref="containerRef" class="canvas-wrapper">
         <canvas ref="canvasRef" class="main-canvas"></canvas>
-        
+
         <CurveEditDialog
             v-model:show="showCurveDialog"
             :curve="tempCurve"

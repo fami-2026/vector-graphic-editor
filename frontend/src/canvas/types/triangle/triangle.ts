@@ -36,16 +36,34 @@ export class TriangleShape extends BaseShape {
     @Editable({ label: 'Цвет заливки', type: 'color' })
     fill: string;
 
-    @Editable({ label: 'Прозрачность заливки', type: 'number', min: 0, max: 1, step: 0.1 })
+    @Editable({
+        label: 'Прозрачность заливки',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.1,
+    })
     fillOpacity: number;
 
     @Editable({ label: 'Цвет контура', type: 'color' })
     stroke: string;
 
-    @Editable({ label: 'Прозрачность контура', type: 'number', min: 0, max: 1, step: 0.1 })
+    @Editable({
+        label: 'Прозрачность контура',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.1,
+    })
     strokeOpacity: number;
 
-    @Editable({ label: 'Толщина контура', type: 'number', min: 0.5, max: 20, step: 0.5 })
+    @Editable({
+        label: 'Толщина контура',
+        type: 'number',
+        min: 0.5,
+        max: 20,
+        step: 0.5,
+    })
     strokeWidth: number;
 
     constructor(
@@ -75,46 +93,57 @@ export class TriangleShape extends BaseShape {
         const rotationRad = (this.rotation * Math.PI) / 180;
         const cos = Math.cos(rotationRad);
         const sin = Math.sin(rotationRad);
-        
+
         const halfW = this.width / 2;
         const halfH = this.height / 2;
-        
+
         const localPoints = [
             { x: 0, y: -halfH },
             { x: -halfW, y: halfH },
-            { x: halfW, y: halfH }
+            { x: halfW, y: halfH },
         ];
-        
-        return localPoints.map(p => ({
+
+        return localPoints.map((p) => ({
             x: this.position.x + p.x * cos - p.y * sin,
-            y: this.position.y + p.x * sin + p.y * cos
+            y: this.position.y + p.x * sin + p.y * cos,
         }));
     }
 
     hitTest(point: Point): boolean {
         const vertices = this.getVertices();
-        
+
         const p1 = vertices[0];
         const p2 = vertices[1];
         const p3 = vertices[2];
-        
+
         if (!p1 || !p2 || !p3) return false;
-        
+
         const padding = this.strokeWidth / 2 + 3;
 
-        const area = 0.5 * Math.abs(
-            (p2.x - p1.x) * (p3.y - p1.y) - (p3.x - p1.x) * (p2.y - p1.y)
-        );
+        const area =
+            0.5 *
+            Math.abs(
+                (p2.x - p1.x) * (p3.y - p1.y) - (p3.x - p1.x) * (p2.y - p1.y)
+            );
 
-        const area1 = 0.5 * Math.abs(
-            (p1.x - point.x) * (p2.y - point.y) - (p2.x - point.x) * (p1.y - point.y)
-        );
-        const area2 = 0.5 * Math.abs(
-            (p2.x - point.x) * (p3.y - point.y) - (p3.x - point.x) * (p2.y - point.y)
-        );
-        const area3 = 0.5 * Math.abs(
-            (p3.x - point.x) * (p1.y - point.y) - (p1.x - point.x) * (p3.y - point.y)
-        );
+        const area1 =
+            0.5 *
+            Math.abs(
+                (p1.x - point.x) * (p2.y - point.y) -
+                    (p2.x - point.x) * (p1.y - point.y)
+            );
+        const area2 =
+            0.5 *
+            Math.abs(
+                (p2.x - point.x) * (p3.y - point.y) -
+                    (p3.x - point.x) * (p2.y - point.y)
+            );
+        const area3 =
+            0.5 *
+            Math.abs(
+                (p3.x - point.x) * (p1.y - point.y) -
+                    (p1.x - point.x) * (p3.y - point.y)
+            );
 
         if (Math.abs(area - (area1 + area2 + area3)) < 0.1) {
             return true;
@@ -123,16 +152,16 @@ export class TriangleShape extends BaseShape {
         const dist1 = this.distanceToSegment(point, p1, p2);
         const dist2 = this.distanceToSegment(point, p2, p3);
         const dist3 = this.distanceToSegment(point, p3, p1);
-        
+
         return Math.min(dist1, dist2, dist3) <= padding;
     }
 
     private distanceToSegment(p: Point, a: Point, b: Point): number {
         const ab = { x: b.x - a.x, y: b.y - a.y };
         const ap = { x: p.x - a.x, y: p.y - a.y };
-        
+
         const t = (ab.x * ap.x + ab.y * ap.y) / (ab.x * ab.x + ab.y * ab.y);
-        
+
         if (t < 0) {
             const dx = p.x - a.x;
             const dy = p.y - a.y;
@@ -151,8 +180,11 @@ export class TriangleShape extends BaseShape {
 
     getBoundingBox(): BoundingBox {
         const vertices = this.getVertices();
-        
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
 
         for (const v of vertices) {
             minX = Math.min(minX, v.x);
@@ -172,11 +204,11 @@ export class TriangleShape extends BaseShape {
 
     render(ctx: CanvasRenderingContext2D): void {
         const vertices = this.getVertices();
-        
+
         const p1 = vertices[0];
         const p2 = vertices[1];
         const p3 = vertices[2];
-        
+
         if (!p1 || !p2 || !p3) return;
 
         ctx.beginPath();
@@ -184,16 +216,16 @@ export class TriangleShape extends BaseShape {
         ctx.lineTo(p2.x, p2.y);
         ctx.lineTo(p3.x, p3.y);
         ctx.closePath();
-        
+
         ctx.globalAlpha = this.fillOpacity;
         ctx.fillStyle = this.fill;
         ctx.fill();
-        
+
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
         ctx.stroke();
-        
+
         ctx.globalAlpha = 1;
     }
 

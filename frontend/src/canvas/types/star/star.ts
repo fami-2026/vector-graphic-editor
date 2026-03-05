@@ -24,7 +24,13 @@ export class StarShape extends BaseShape {
         this.move({ x: 0, y: delta });
     }
 
-    @Editable({ label: 'Количество лучей', type: 'number', min: 3, max: 20, step: 1 })
+    @Editable({
+        label: 'Количество лучей',
+        type: 'number',
+        min: 3,
+        max: 20,
+        step: 1,
+    })
     numPoints: number;
 
     @Editable({ label: 'Ширина', type: 'number', min: 1 })
@@ -39,16 +45,34 @@ export class StarShape extends BaseShape {
     @Editable({ label: 'Цвет заливки', type: 'color' })
     fill: string;
 
-    @Editable({ label: 'Прозрачность заливки', type: 'number', min: 0, max: 1, step: 0.1 })
+    @Editable({
+        label: 'Прозрачность заливки',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.1,
+    })
     fillOpacity: number;
 
     @Editable({ label: 'Цвет контура', type: 'color' })
     stroke: string;
 
-    @Editable({ label: 'Прозрачность контура', type: 'number', min: 0, max: 1, step: 0.1 })
+    @Editable({
+        label: 'Прозрачность контура',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.1,
+    })
     strokeOpacity: number;
 
-    @Editable({ label: 'Толщина контура', type: 'number', min: 0.5, max: 20, step: 0.5 })
+    @Editable({
+        label: 'Толщина контура',
+        type: 'number',
+        min: 0.5,
+        max: 20,
+        step: 0.5,
+    })
     strokeWidth: number;
 
     private innerRatio: number = 0.5;
@@ -82,7 +106,7 @@ export class StarShape extends BaseShape {
         const step = Math.PI / this.numPoints;
         const rotRad = (this.rotation * Math.PI) / 180;
         const result: Point[] = [];
-        
+
         const outerRadiusX = this.width / 2;
         const outerRadiusY = this.height / 2;
         const innerRadiusX = outerRadiusX * this.innerRatio;
@@ -111,12 +135,14 @@ export class StarShape extends BaseShape {
         for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
             const p1 = points[i];
             const p2 = points[j];
-            
+
             if (!p1 || !p2) continue;
 
-            const intersect = ((p1.y > point.y) !== (p2.y > point.y)) &&
-                (point.x < (p2.x - p1.x) * (point.y - p1.y) / (p2.y - p1.y) + p1.x);
-            
+            const intersect =
+                p1.y > point.y !== p2.y > point.y &&
+                point.x <
+                    ((p2.x - p1.x) * (point.y - p1.y)) / (p2.y - p1.y) + p1.x;
+
             if (intersect) inside = !inside;
         }
 
@@ -126,7 +152,7 @@ export class StarShape extends BaseShape {
             const j = (i + 1) % points.length;
             const pi = points[i];
             const pj = points[j];
-            
+
             if (pi && pj) {
                 const distance = this.distanceToSegment(point, pi, pj);
                 if (distance <= padding) return true;
@@ -139,9 +165,9 @@ export class StarShape extends BaseShape {
     private distanceToSegment(p: Point, a: Point, b: Point): number {
         const ab = { x: b.x - a.x, y: b.y - a.y };
         const ap = { x: p.x - a.x, y: p.y - a.y };
-        
+
         const t = (ab.x * ap.x + ab.y * ap.y) / (ab.x * ab.x + ab.y * ab.y);
-        
+
         if (t < 0) {
             const dx = p.x - a.x;
             const dy = p.y - a.y;
@@ -160,8 +186,11 @@ export class StarShape extends BaseShape {
 
     getBoundingBox(): BoundingBox {
         const points = this.getPoints();
-        
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
 
         for (const p of points) {
             minX = Math.min(minX, p.x);
@@ -181,7 +210,7 @@ export class StarShape extends BaseShape {
 
     render(ctx: CanvasRenderingContext2D): void {
         const points = this.getPoints();
-        
+
         const validPoints: Point[] = [];
         for (let i = 0; i < points.length; i++) {
             const point = points[i];
@@ -189,33 +218,33 @@ export class StarShape extends BaseShape {
                 validPoints.push(point);
             }
         }
-        
+
         if (validPoints.length < 3) return;
 
         ctx.beginPath();
-        
+
         const firstPoint = validPoints[0];
         if (!firstPoint) return;
         ctx.moveTo(firstPoint.x, firstPoint.y);
-        
+
         for (let i = 1; i < validPoints.length; i++) {
             const point = validPoints[i];
             if (point) {
                 ctx.lineTo(point.x, point.y);
             }
         }
-        
+
         ctx.closePath();
-        
+
         ctx.globalAlpha = this.fillOpacity;
         ctx.fillStyle = this.fill;
         ctx.fill();
-        
+
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
         ctx.stroke();
-        
+
         ctx.globalAlpha = 1;
     }
 

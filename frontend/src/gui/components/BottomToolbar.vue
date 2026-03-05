@@ -117,7 +117,11 @@ function handleClick(tool: Tool) {
 }
 
 function createPolygon() {
-    canvasStore.addShape('polygon', { x: 400, y: 300 }, { sides: polygonSides.value });
+    canvasStore.addShape(
+        'polygon',
+        { x: 400, y: 300 },
+        { sides: polygonSides.value }
+    );
     showPolygonDialog.value = false;
     polygonSides.value = 5;
     toolsStore.setActiveTool('select');
@@ -159,25 +163,31 @@ const activeId = computed<ToolId>(() => {
         </button>
 
         <Teleport to="body">
-        <div v-if="showPolygonDialog" class="modal-overlay" @click="showPolygonDialog = false">
-            <div class="modal" @click.stop>
-                <h3>Создание многоугольника</h3>
-                <div class="form-group">
-                    <label>Количество углов (3-20):</label>
-                    <input 
-                        type="number" 
-                        v-model.number="polygonSides" 
-                        min="3" 
-                        max="20"
-                        @keyup.enter="createPolygon"
-                    />
-                </div>
-                <div class="modal-buttons">
-                    <button @click="createPolygon">Создать</button>
-                    <button @click="showPolygonDialog = false">Отмена</button>
+            <div
+                v-if="showPolygonDialog"
+                class="modal-overlay"
+                @click="showPolygonDialog = false"
+            >
+                <div class="modal" @click.stop>
+                    <h3>Создание многоугольника</h3>
+                    <div class="form-group">
+                        <label>Количество углов (3-20):</label>
+                        <input
+                            type="number"
+                            v-model.number="polygonSides"
+                            min="3"
+                            max="20"
+                            @keyup.enter="createPolygon"
+                        />
+                    </div>
+                    <div class="modal-buttons">
+                        <button @click="createPolygon">Создать</button>
+                        <button @click="showPolygonDialog = false">
+                            Отмена
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
         </Teleport>
     </div>
 </template>

@@ -33,7 +33,7 @@ const tools: ToolConfig[] = [
         title: 'Прямоугольник',
         action: () => addShape('rect'),
     },
-       {
+    {
         id: 'circle',
         icon: '◯',
         title: 'Круг',
@@ -95,7 +95,7 @@ function handleToolClick(tool: ToolConfig) {
 
 interface ShapeParams {
     sides?: number;
-    [key: string]: unknown; 
+    [key: string]: unknown;
 }
 
 function addShape(type: ShapeType, customParams?: ShapeParams) {
@@ -125,15 +125,19 @@ function createPolygon() {
             </button>
         </div>
 
-        <div v-if="showPolygonDialog" class="modal-overlay" @click="showPolygonDialog = false">
+        <div
+            v-if="showPolygonDialog"
+            class="modal-overlay"
+            @click="showPolygonDialog = false"
+        >
             <div class="modal" @click.stop>
                 <h3>Создание многоугольника</h3>
                 <div class="form-group">
                     <label>Количество углов (3-12):</label>
-                    <input 
-                        type="number" 
-                        v-model.number="polygonSides" 
-                        min="3" 
+                    <input
+                        type="number"
+                        v-model.number="polygonSides"
+                        min="3"
                         max="12"
                         @keyup.enter="createPolygon"
                     />

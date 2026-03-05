@@ -24,7 +24,13 @@ export class PolygonShape extends BaseShape {
         this.move({ x: 0, y: delta });
     }
 
-    @Editable({ label: 'Количество углов', type: 'number', min: 3, max: 12, step: 1 })
+    @Editable({
+        label: 'Количество углов',
+        type: 'number',
+        min: 3,
+        max: 12,
+        step: 1,
+    })
     sides: number;
 
     @Editable({ label: 'Ширина', type: 'number', min: 1 })
@@ -39,16 +45,34 @@ export class PolygonShape extends BaseShape {
     @Editable({ label: 'Цвет заливки', type: 'color' })
     fill: string;
 
-    @Editable({ label: 'Прозрачность заливки', type: 'number', min: 0, max: 1, step: 0.1 })
+    @Editable({
+        label: 'Прозрачность заливки',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.1,
+    })
     fillOpacity: number;
 
     @Editable({ label: 'Цвет контура', type: 'color' })
     stroke: string;
 
-    @Editable({ label: 'Прозрачность контура', type: 'number', min: 0, max: 1, step: 0.1 })
+    @Editable({
+        label: 'Прозрачность контура',
+        type: 'number',
+        min: 0,
+        max: 1,
+        step: 0.1,
+    })
     strokeOpacity: number;
 
-    @Editable({ label: 'Толщина контура', type: 'number', min: 0.5, max: 20, step: 0.5 })
+    @Editable({
+        label: 'Толщина контура',
+        type: 'number',
+        min: 0.5,
+        max: 20,
+        step: 0.5,
+    })
     strokeWidth: number;
 
     constructor(
@@ -96,19 +120,21 @@ export class PolygonShape extends BaseShape {
     hitTest(point: Point): boolean {
         const points = this.getPoints();
         const padding = this.strokeWidth / 2 + 3;
-        
+
         if (points.length < 3) return false;
 
         let inside = false;
         for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
             const pi = points[i];
             const pj = points[j];
-            
+
             if (!pi || !pj) continue;
 
-            const intersect = ((pi.y > point.y) !== (pj.y > point.y)) &&
-                (point.x < (pj.x - pi.x) * (point.y - pi.y) / (pj.y - pi.y) + pi.x);
-            
+            const intersect =
+                pi.y > point.y !== pj.y > point.y &&
+                point.x <
+                    ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y) + pi.x;
+
             if (intersect) inside = !inside;
         }
 
@@ -118,7 +144,7 @@ export class PolygonShape extends BaseShape {
             const j = (i + 1) % points.length;
             const pi = points[i];
             const pj = points[j];
-            
+
             if (pi && pj) {
                 const distance = this.distanceToSegment(point, pi, pj);
                 if (distance <= padding) return true;
@@ -131,9 +157,9 @@ export class PolygonShape extends BaseShape {
     private distanceToSegment(p: Point, a: Point, b: Point): number {
         const ab = { x: b.x - a.x, y: b.y - a.y };
         const ap = { x: p.x - a.x, y: p.y - a.y };
-        
+
         const t = (ab.x * ap.x + ab.y * ap.y) / (ab.x * ab.x + ab.y * ab.y);
-        
+
         if (t < 0) {
             const dx = p.x - a.x;
             const dy = p.y - a.y;
@@ -152,8 +178,11 @@ export class PolygonShape extends BaseShape {
 
     getBoundingBox(): BoundingBox {
         const points = this.getPoints();
-        
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
 
         for (const p of points) {
             minX = Math.min(minX, p.x);
@@ -173,7 +202,7 @@ export class PolygonShape extends BaseShape {
 
     render(ctx: CanvasRenderingContext2D): void {
         const points = this.getPoints();
-        
+
         const validPoints: Point[] = [];
         for (let i = 0; i < points.length; i++) {
             const point = points[i];
@@ -181,33 +210,33 @@ export class PolygonShape extends BaseShape {
                 validPoints.push(point);
             }
         }
-        
+
         if (validPoints.length < 3) return;
 
         ctx.beginPath();
-        
+
         const firstPoint = validPoints[0];
         if (!firstPoint) return;
         ctx.moveTo(firstPoint.x, firstPoint.y);
-        
+
         for (let i = 1; i < validPoints.length; i++) {
             const point = validPoints[i];
             if (point) {
                 ctx.lineTo(point.x, point.y);
             }
         }
-        
+
         ctx.closePath();
-        
+
         ctx.globalAlpha = this.fillOpacity;
         ctx.fillStyle = this.fill;
         ctx.fill();
-        
+
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
         ctx.stroke();
-        
+
         ctx.globalAlpha = 1;
     }
 

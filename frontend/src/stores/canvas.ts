@@ -50,7 +50,7 @@ interface CurveDrawingState {
 export const useCanvasStore = defineStore('canvas', () => {
     const shapes = ref<Shape[]>([]);
     const selectedId = ref<string | null>(null);
-    
+
     const curveDrawing = ref<CurveDrawingState | null>(null);
     const tempCurve = ref<EditableCurve | null>(null);
     const showCurveDialog = ref(false);
@@ -63,7 +63,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function startCurveDrawing() {
         curveDrawing.value = {
-            points: []
+            points: [],
         };
     }
 
@@ -71,7 +71,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         if (!curveDrawing.value) return;
 
         curveDrawing.value.points.push({ x, y });
-        
+
         if (curveDrawing.value.points.length === 2) {
             createStraightCurve();
         }
@@ -79,22 +79,22 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function createStraightCurve() {
         if (!curveDrawing.value) return;
-        
+
         if (curveDrawing.value.points.length === 2) {
             const points = curveDrawing.value.points;
             const start = points[0];
             const end = points[1];
-            
+
             if (start && end) {
                 const dx = end.x - start.x;
                 const dy = end.y - start.y;
-                
+
                 const centerX = 250;
                 const centerY = 150;
-                
+
                 const offsetX = centerX - (start.x + end.x) / 2;
                 const offsetY = centerY - (start.y + end.y) / 2;
-                
+
                 const curve: EditableCurve = {
                     startX: start.x + offsetX,
                     startY: start.y + offsetY,
@@ -102,8 +102,8 @@ export const useCanvasStore = defineStore('canvas', () => {
                     endY: end.y + offsetY,
                     cp1X: start.x + dx / 3 + offsetX,
                     cp1Y: start.y + dy / 3 + offsetY,
-                    cp2X: start.x + 2 * dx / 3 + offsetX,
-                    cp2Y: start.y + 2 * dy / 3 + offsetY,
+                    cp2X: start.x + (2 * dx) / 3 + offsetX,
+                    cp2Y: start.y + (2 * dy) / 3 + offsetY,
                     stroke: '#000000',
                     strokeOpacity: 1,
                     strokeWidth: 2,
@@ -113,9 +113,9 @@ export const useCanvasStore = defineStore('canvas', () => {
                     originalEndX: end.x,
                     originalEndY: end.y,
                     offsetX: offsetX,
-                    offsetY: offsetY
+                    offsetY: offsetY,
                 };
-                
+
                 tempCurve.value = curve;
                 isEditingExisting.value = false;
                 editingCurveId.value = null;
@@ -127,17 +127,20 @@ export const useCanvasStore = defineStore('canvas', () => {
     function confirmCurve() {
         if (tempCurve.value) {
             const c = tempCurve.value;
-            
+
             if (isEditingExisting.value && editingCurveId.value) {
-                const index = shapes.value.findIndex(s => s.id === editingCurveId.value);
-                if (index !== -1 && 
-                    c.originalStartX !== undefined && 
-                    c.originalStartY !== undefined && 
-                    c.originalEndX !== undefined && 
+                const index = shapes.value.findIndex(
+                    (s) => s.id === editingCurveId.value
+                );
+                if (
+                    index !== -1 &&
+                    c.originalStartX !== undefined &&
+                    c.originalStartY !== undefined &&
+                    c.originalEndX !== undefined &&
                     c.originalEndY !== undefined &&
-                    c.offsetX !== undefined && 
-                    c.offsetY !== undefined) {
-                    
+                    c.offsetX !== undefined &&
+                    c.offsetY !== undefined
+                ) {
                     const updatedCurve = new CurveShape(
                         editingCurveId.value,
                         { x: c.originalStartX, y: c.originalStartY },
@@ -153,18 +156,18 @@ export const useCanvasStore = defineStore('canvas', () => {
                         c.strokeOpacity,
                         c.strokeWidth
                     );
-                    
+
                     updatedCurve.bendCount = c.bendCount;
                     shapes.value.splice(index, 1, updatedCurve);
                 }
             } else if (
-                c.originalStartX !== undefined && 
-                c.originalStartY !== undefined && 
-                c.originalEndX !== undefined && 
+                c.originalStartX !== undefined &&
+                c.originalStartY !== undefined &&
+                c.originalEndX !== undefined &&
                 c.originalEndY !== undefined &&
-                c.offsetX !== undefined && 
-                c.offsetY !== undefined) {
-                
+                c.offsetX !== undefined &&
+                c.offsetY !== undefined
+            ) {
                 const curve = new CurveShape(
                     generateId(),
                     { x: c.originalStartX, y: c.originalStartY },
@@ -180,11 +183,11 @@ export const useCanvasStore = defineStore('canvas', () => {
                     c.strokeOpacity,
                     c.strokeWidth
                 );
-                
+
                 curve.bendCount = c.bendCount;
                 shapes.value.push(curve);
             }
-            
+
             tempCurve.value = null;
         }
         curveDrawing.value = null;
@@ -204,10 +207,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     function editCurve(curve: EditableCurve) {
         const centerX = 250;
         const centerY = 150;
-        
+
         const offsetX = centerX - (curve.startX + curve.endX) / 2;
         const offsetY = centerY - (curve.startY + curve.endY) / 2;
-        
+
         const editableCurve: EditableCurve = {
             id: curve.id,
             startX: curve.startX + offsetX,
@@ -227,16 +230,20 @@ export const useCanvasStore = defineStore('canvas', () => {
             originalEndX: curve.endX,
             originalEndY: curve.endY,
             offsetX: offsetX,
-            offsetY: offsetY
+            offsetY: offsetY,
         };
-        
+
         tempCurve.value = editableCurve;
         isEditingExisting.value = true;
         editingCurveId.value = curve.id || null;
         showCurveDialog.value = true;
     }
 
-    function addShape(type: string, pos: { x: number; y: number }, params?: ShapeParams) {
+    function addShape(
+        type: string,
+        pos: { x: number; y: number },
+        params?: ShapeParams
+    ) {
         if (type === 'polygon' && params?.sides) {
             const shape = new PolygonShape(
                 generateId(),
@@ -254,7 +261,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             shapes.value.push(shape);
             return shape;
         }
-        
+
         const shape = shapeRegistry.create(type, generateId(), pos);
         shapes.value.push(shape);
         return shape;

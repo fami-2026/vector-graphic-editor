@@ -1,1 +1,1 @@
-export { CurveShape} from './curve';
+export { CurveShape } from './curve';
