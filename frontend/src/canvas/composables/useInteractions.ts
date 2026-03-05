@@ -201,6 +201,8 @@ export function useInteractions(
         const point = getLocalPoint(e);
         const topShape = hitTest(point);
 
+        canvasStore.startInteraction();
+
         if (toolsStore.activeTool === 'eraser') {
             if (topShape) {
                 canvasStore.deleteShape(topShape.id);
@@ -367,6 +369,7 @@ export function useInteractions(
     }
 
     function onMouseUp(e: MouseEvent) {
+        canvasStore.endInteraction();
         isDragging.value = false;
         isResizing.value = false;
         resizeHandle.value = null;

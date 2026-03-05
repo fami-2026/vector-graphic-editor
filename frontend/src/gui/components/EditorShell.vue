@@ -25,11 +25,40 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue';
 import TopLeftActions from './TopLeftActions.vue';
 import InspectorPanel from './InspectorPanel.vue';
 import BottomToolbar from './BottomToolbar.vue';
 import BottomLeftControls from './BottomLeftControls.vue';
 import VectorCanvas from '@/canvas/components/VectorCanvas.vue';
+import { useCanvasStore } from '@/stores/canvas';
+
+const canvasStore = useCanvasStore();
+
+function handleKeydown(e: KeyboardEvent) {
+    const isCtrl = e.ctrlKey || e.metaKey;
+    if (!isCtrl) return;
+
+    if (e.key === 'z' || e.key === 'я') {
+        e.preventDefault();
+        if (e.shiftKey) {
+            if (canvasStore.canRedo) canvasStore.redo();
+        } else {
+            if (canvasStore.canUndo) canvasStore.undo();
+        }
+    } else if (e.key === 'y' || e.key === 'н') {
+        e.preventDefault();
+        if (canvasStore.canRedo) canvasStore.redo();
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('keydown', handleKeydown);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('keydown', handleKeydown);
+});
 </script>
 
 <style scoped>
