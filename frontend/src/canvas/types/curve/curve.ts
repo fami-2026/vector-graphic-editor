@@ -1,5 +1,5 @@
 /**
- * Кривая 
+ * Кривая Безье
  */
 import { Editable } from '../property';
 import type { BoundingBox, Point } from '../base';
@@ -45,20 +45,9 @@ export class CurveShape extends BaseShape {
     })
     strokeWidth: number;
 
-    /**
-     * @param id Идентификатор
-     * @param position Центр 
-     * @param startX Начальная точка X
-     * @param startY Начальная точка Y
-     * @param endX Конечная точка X
-     * @param endY Конечная точка Y
-     * @param cp1X Первая контрольная точка X
-     * @param cp1Y Первая контрольная точка Y
-     * @param cp2X Вторая контрольная точка X
-     * @param cp2Y Вторая контрольная точка Y
-     * @param stroke Цвет границы 
-     * @param strokeWidth Толщина границы 
-     */
+    // Флаг для отслеживания количества изгибов
+    bendCount: number = 0;
+
     constructor(
         id: string,
         position: Point,
@@ -66,24 +55,101 @@ export class CurveShape extends BaseShape {
         startY: number = 100,
         endX: number = 250,
         endY: number = 100,
-        cp1X: number = 100,
-        cp1Y: number = 0,
-        cp2X: number = 200,
-        cp2Y: number = 200,
+        cp1X?: number,
+        cp1Y?: number,
+        cp2X?: number,
+        cp2Y?: number,
         stroke: string = '#2c3e50',
         strokeWidth: number = 2
     ) {
         super(id, position);
+        
         this.startX = startX;
         this.startY = startY;
         this.endX = endX;
         this.endY = endY;
-        this.cp1X = cp1X;
-        this.cp1Y = cp1Y;
-        this.cp2X = cp2X;
-        this.cp2Y = cp2Y;
+        
+        // Если контрольные точки не переданы, делаем прямую линию
+        // (контрольные точки на 1/3 и 2/3 от начала)
+        const dx = endX - startX;
+        const dy = endY - startY;
+        
+        this.cp1X = cp1X ?? startX + dx / 3;
+        this.cp1Y = cp1Y ?? startY + dy / 3;
+        this.cp2X = cp2X ?? startX + 2 * dx / 3;
+        this.cp2Y = cp2Y ?? startY + 2 * dy / 3;
+        
+        // Подсчитываем количество изгибов (есть ли отклонения от прямой)
+        this.updateBendCount();
+        
         this.stroke = stroke;
         this.strokeWidth = strokeWidth;
+    }
+
+    private updateBendCount() {
+        const dx = this.endX - this.startX;
+        const dy = this.endY - this.startY;
+        
+        // Проверяем отклонение первой контрольной точки от прямой
+        const straightC1X = this.startX + dx / 3;
+        const straightC1Y = this.startY + dy / 3;
+        const dist1 = Math.sqrt(
+            Math.pow(this.cp1X - straightC1X, 2) + 
+            Math.pow(this.cp1Y - straightC1Y, 2)
+        );
+        
+        // Проверяем отклонение второй контрольной точки от прямой
+        const straightC2X = this.startX + 2 * dx / 3;
+        const straightC2Y = this.startY + 2 * dy / 3;
+        const dist2 = Math.sqrt(
+            Math.pow(this.cp2X - straightC2X, 2) + 
+            Math.pow(this.cp2Y - straightC2Y, 2)
+        );
+        
+        // Считаем изгибами отклонения больше 5 пикселей
+        this.bendCount = (dist1 > 5 ? 1 : 0) + (dist2 > 5 ? 1 : 0);
+    }
+
+    // Добавить изгиб в указанной точке
+    addBend(x: number, y: number): boolean {
+        if (this.bendCount >= 2) return false;
+        
+        // Находим ближайшую позицию для вставки
+        const t = this.findClosestT(x, y);
+        
+        if (this.bendCount === 0) {
+            // Первый изгиб - меняем cp1
+            this.cp1X = x;
+            this.cp1Y = y;
+        } else {
+            // Второй изгиб - меняем cp2
+            this.cp2X = x;
+            this.cp2Y = y;
+        }
+        
+        this.bendCount++;
+        return true;
+    }
+
+    // Найти параметр t ближайшей точки на кривой
+    private findClosestT(x: number, y: number): number {
+        const steps = 50;
+        let minDist = Infinity;
+        let bestT = 0.5;
+        
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const tx = this.cubicBezier(this.startX, this.cp1X, this.cp2X, this.endX, t);
+            const ty = this.cubicBezier(this.startY, this.cp1Y, this.cp2Y, this.endY, t);
+            
+            const dist = Math.sqrt(Math.pow(x - tx, 2) + Math.pow(y - ty, 2));
+            if (dist < minDist) {
+                minDist = dist;
+                bestT = t;
+            }
+        }
+        
+        return bestT;
     }
 
     hitTest(point: Point): boolean {

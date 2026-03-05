@@ -120,7 +120,6 @@ function createPolygon() {
             </button>
         </div>
 
-        <!-- Диалог для многоугольника -->
         <div v-if="showPolygonDialog" class="modal-overlay" @click="showPolygonDialog = false">
             <div class="modal" @click.stop>
                 <h3>Создание многоугольника</h3>
