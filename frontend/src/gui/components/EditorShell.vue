@@ -39,14 +39,15 @@ function handleKeydown(e: KeyboardEvent) {
     const isCtrl = e.ctrlKey || e.metaKey;
     if (!isCtrl) return;
 
-    if (e.key === 'z' || e.key === 'я') {
+    // Используем e.code, чтобы горячие клавиши были независимы от раскладки
+    if (e.code === 'KeyZ') {
         e.preventDefault();
         if (e.shiftKey) {
             if (canvasStore.canRedo) canvasStore.redo();
         } else {
             if (canvasStore.canUndo) canvasStore.undo();
         }
-    } else if (e.key === 'y' || e.key === 'н') {
+    } else if (e.code === 'KeyY') {
         e.preventDefault();
         if (canvasStore.canRedo) canvasStore.redo();
     }
