@@ -12,6 +12,7 @@ interface EditableCurve {
     cp2X: number;
     cp2Y: number;
     stroke: string;
+    strokeOpacity: number;
     strokeWidth: number;
     bendCount: number;
     originalStartX?: number;
@@ -50,7 +51,6 @@ const currentHistoryIndex = ref(-1);
 
 const dragT = ref<number | null>(null);
 const lastMousePos = ref<{ x: number, y: number } | null>(null);
-
 const isLocked = ref(false);
 
 function saveState() {
@@ -70,8 +70,6 @@ function saveState() {
     
     history.value.push(state);
     currentHistoryIndex.value = history.value.length - 1;
-    
-    console.log('State saved:', state);
 }
 
 function undo() {
@@ -88,8 +86,6 @@ function undo() {
             props.curve.bendCount = state.bendCount;
             
             isLocked.value = bendCount.value >= 2;
-            
-            console.log('Undo to:', state);
         }
     }
 }
@@ -344,7 +340,7 @@ function getCurvePath(): string {
                     Добавить изгиб
                 </button>
                 <button @click="undo" :disabled="currentHistoryIndex <= 0" class="undo-btn">
-                    Отменить
+                    ↩ Отменить
                 </button>
             </div>
             

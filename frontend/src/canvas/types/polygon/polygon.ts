@@ -1,65 +1,78 @@
-/**
- * Правильный многоугольник.
- */
-import { Editable, HideProperties } from '../property';
+import { Editable } from '../property';
 import type { BoundingBox, Point } from '../base';
 import { BaseShape } from '../base';
 import { shapeRegistry } from '../registry';
 
-@HideProperties(['x', 'y'])
 export class PolygonShape extends BaseShape {
     type = 'polygon';
 
-    @Editable({ label: 'Sides', type: 'number', min: 3, max: 12, step: 1 })
+    @Editable({ label: 'Позиция X', type: 'number' })
+    get x(): number {
+        return this.position.x;
+    }
+    set x(value: number) {
+        const delta = value - this.position.x;
+        this.move({ x: delta, y: 0 });
+    }
+
+    @Editable({ label: 'Позиция Y', type: 'number' })
+    get y(): number {
+        return this.position.y;
+    }
+    set y(value: number) {
+        const delta = value - this.position.y;
+        this.move({ x: 0, y: delta });
+    }
+
+    @Editable({ label: 'Количество углов', type: 'number', min: 3, max: 12, step: 1 })
     sides: number;
 
-    @Editable({ label: 'Radius', type: 'number', min: 1 })
-    radius: number;
+    @Editable({ label: 'Ширина', type: 'number', min: 1 })
+    width: number;
 
-    @Editable({ label: 'Rotation', type: 'number', min: 0, max: 360, step: 1 })
+    @Editable({ label: 'Высота', type: 'number', min: 1 })
+    height: number;
+
+    @Editable({ label: 'Поворот', type: 'number', min: 0, max: 360, step: 1 })
     rotation: number;
 
-    @Editable({ label: 'Fill', type: 'color' })
+    @Editable({ label: 'Цвет заливки', type: 'color' })
     fill: string;
 
-    @Editable({ label: 'Stroke', type: 'color' })
+    @Editable({ label: 'Прозрачность заливки', type: 'number', min: 0, max: 1, step: 0.1 })
+    fillOpacity: number;
+
+    @Editable({ label: 'Цвет контура', type: 'color' })
     stroke: string;
 
-    @Editable({
-        label: 'Stroke Width',
-        type: 'number',
-        min: 0.5,
-        max: 20,
-        step: 0.5,
-    })
+    @Editable({ label: 'Прозрачность контура', type: 'number', min: 0, max: 1, step: 0.1 })
+    strokeOpacity: number;
+
+    @Editable({ label: 'Толщина контура', type: 'number', min: 0.5, max: 20, step: 0.5 })
     strokeWidth: number;
 
-    /**
-     * @param id Идентификатор
-     * @param position Центр многоугольника
-     * @param sides Количество сторон 
-     * @param radius Радиус описанной окружности 
-     * @param rotation Поворот в градусах 
-     * @param fill Цвет заливки 
-     * @param stroke Цвет границы 
-     * @param strokeWidth Толщина границы 
-     */
     constructor(
         id: string,
         position: Point,
         sides: number = 5,
-        radius: number = 50,
+        width: number = 100,
+        height: number = 100,
         rotation: number = 0,
         fill: string = 'transparent',
+        fillOpacity: number = 1,
         stroke: string = '#000000',
+        strokeOpacity: number = 1,
         strokeWidth: number = 2
     ) {
         super(id, position);
         this.sides = sides;
-        this.radius = radius;
+        this.width = width;
+        this.height = height;
         this.rotation = rotation;
         this.fill = fill;
+        this.fillOpacity = fillOpacity;
         this.stroke = stroke;
+        this.strokeOpacity = strokeOpacity;
         this.strokeWidth = strokeWidth;
     }
 
@@ -67,12 +80,14 @@ export class PolygonShape extends BaseShape {
         const points: Point[] = [];
         const angleStep = (Math.PI * 2) / this.sides;
         const rotationRad = (this.rotation * Math.PI) / 180;
+        const radiusX = this.width / 2;
+        const radiusY = this.height / 2;
 
         for (let i = 0; i < this.sides; i++) {
             const angle = i * angleStep + rotationRad;
             points.push({
-                x: this.position.x + this.radius * Math.cos(angle),
-                y: this.position.y + this.radius * Math.sin(angle),
+                x: this.position.x + radiusX * Math.cos(angle),
+                y: this.position.y + radiusY * Math.sin(angle),
             });
         }
         return points;
@@ -156,42 +171,45 @@ export class PolygonShape extends BaseShape {
         };
     }
 
-render(ctx: CanvasRenderingContext2D): void {
-    const points = this.getPoints();
-    
-    const validPoints: Point[] = [];
-    for (let i = 0; i < points.length; i++) {
-        const point = points[i];
-        if (point) {
-            validPoints.push(point);
+    render(ctx: CanvasRenderingContext2D): void {
+        const points = this.getPoints();
+        
+        const validPoints: Point[] = [];
+        for (let i = 0; i < points.length; i++) {
+            const point = points[i];
+            if (point) {
+                validPoints.push(point);
+            }
         }
-    }
-    
-    if (validPoints.length < 3) return;
+        
+        if (validPoints.length < 3) return;
 
-    ctx.fillStyle = this.fill;
-    ctx.strokeStyle = this.stroke;
-    ctx.lineWidth = this.strokeWidth;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-
-    ctx.beginPath();
-    
-    const firstPoint = validPoints[0];
-    if (!firstPoint) return;
-    ctx.moveTo(firstPoint.x, firstPoint.y);
-    
-    for (let i = 1; i < validPoints.length; i++) {
-        const point = validPoints[i];
-        if (point) {
-            ctx.lineTo(point.x, point.y);
+        ctx.beginPath();
+        
+        const firstPoint = validPoints[0];
+        if (!firstPoint) return;
+        ctx.moveTo(firstPoint.x, firstPoint.y);
+        
+        for (let i = 1; i < validPoints.length; i++) {
+            const point = validPoints[i];
+            if (point) {
+                ctx.lineTo(point.x, point.y);
+            }
         }
+        
+        ctx.closePath();
+        
+        ctx.globalAlpha = this.fillOpacity;
+        ctx.fillStyle = this.fill;
+        ctx.fill();
+        
+        ctx.globalAlpha = this.strokeOpacity;
+        ctx.strokeStyle = this.stroke;
+        ctx.lineWidth = this.strokeWidth;
+        ctx.stroke();
+        
+        ctx.globalAlpha = 1;
     }
-    
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-}
 
     move(delta: Point): void {
         this.position.x += delta.x;

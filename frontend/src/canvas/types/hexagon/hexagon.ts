@@ -1,6 +1,3 @@
-/**
- * Шестиугольник.
- */
 import { Editable } from '../property';
 import type { BoundingBox, Point } from '../base';
 import { BaseShape } from '../base';
@@ -9,63 +6,83 @@ import { shapeRegistry } from '../registry';
 export class HexagonShape extends BaseShape {
     type = 'hexagon';
 
-    @Editable({ label: 'Radius', type: 'number', min: 1 })
-    radius: number;
+    @Editable({ label: 'Позиция X', type: 'number' })
+    get x(): number {
+        return this.position.x;
+    }
+    set x(value: number) {
+        const delta = value - this.position.x;
+        this.move({ x: delta, y: 0 });
+    }
 
-    @Editable({ label: 'Rotation', type: 'number', min: 0, max: 360, step: 1 })
+    @Editable({ label: 'Позиция Y', type: 'number' })
+    get y(): number {
+        return this.position.y;
+    }
+    set y(value: number) {
+        const delta = value - this.position.y;
+        this.move({ x: 0, y: delta });
+    }
+
+    @Editable({ label: 'Ширина', type: 'number', min: 1 })
+    width: number;
+
+    @Editable({ label: 'Высота', type: 'number', min: 1 })
+    height: number;
+
+    @Editable({ label: 'Поворот', type: 'number', min: 0, max: 360, step: 1 })
     rotation: number;
 
-    @Editable({ label: 'Fill', type: 'color' })
+    @Editable({ label: 'Цвет заливки', type: 'color' })
     fill: string;
 
-    @Editable({ label: 'Stroke', type: 'color' })
+    @Editable({ label: 'Прозрачность заливки', type: 'number', min: 0, max: 1, step: 0.1 })
+    fillOpacity: number;
+
+    @Editable({ label: 'Цвет контура', type: 'color' })
     stroke: string;
 
-    @Editable({
-        label: 'Stroke Width',
-        type: 'number',
-        min: 0.5,
-        max: 20,
-        step: 0.5,
-    })
+    @Editable({ label: 'Прозрачность контура', type: 'number', min: 0, max: 1, step: 0.1 })
+    strokeOpacity: number;
+
+    @Editable({ label: 'Толщина контура', type: 'number', min: 0.5, max: 20, step: 0.5 })
     strokeWidth: number;
 
-    /**
-     * @param id Идентификатор
-     * @param position Центр шестиугольника
-     * @param radius Радиус описанной окружности 
-     * @param rotation Поворот в градусах
-     * @param fill Цвет заливки 
-     * @param stroke Цвет границы 
-     * @param strokeWidth Толщина границы 
-     */
     constructor(
         id: string,
         position: Point,
-        radius: number = 50,
+        width: number = 100,
+        height: number = 100,
         rotation: number = 0,
-        fill: string = '#2ecc71',
-        stroke: string = '#27ae60',
+        fill: string = 'transparent',
+        fillOpacity: number = 1,
+        stroke: string = '#000000',
+        strokeOpacity: number = 1,
         strokeWidth: number = 2
     ) {
         super(id, position);
-        this.radius = radius;
+        this.width = width;
+        this.height = height;
         this.rotation = rotation;
         this.fill = fill;
+        this.fillOpacity = fillOpacity;
         this.stroke = stroke;
+        this.strokeOpacity = strokeOpacity;
         this.strokeWidth = strokeWidth;
     }
 
     private getPoints(): Point[] {
         const points: Point[] = [];
-        const angleStep = (Math.PI * 2) / 6; 
+        const angleStep = (Math.PI * 2) / 6;
         const rotationRad = (this.rotation * Math.PI) / 180;
+        const radiusX = this.width / 2;
+        const radiusY = this.height / 2;
 
         for (let i = 0; i < 6; i++) {
             const angle = i * angleStep + rotationRad;
             points.push({
-                x: this.position.x + this.radius * Math.cos(angle),
-                y: this.position.y + this.radius * Math.sin(angle),
+                x: this.position.x + radiusX * Math.cos(angle),
+                y: this.position.y + radiusY * Math.sin(angle),
             });
         }
 
@@ -80,25 +97,22 @@ export class HexagonShape extends BaseShape {
 
         let inside = false;
         for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-            const xi = points[i]?.x;
-            const yi = points[i]?.y;
-            const xj = points[j]?.x;
-            const yj = points[j]?.y;
+            const p1 = points[i];
+            const p2 = points[j];
+            
+            if (!p1 || !p2) continue;
 
-            if (xi === undefined || yi === undefined || xj === undefined || yj === undefined) {
-                continue;
-            }
-
-            const intersect = ((yi > point.y) !== (yj > point.y)) &&
-                (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+            const intersect = ((p1.y > point.y) !== (p2.y > point.y)) &&
+                (point.x < (p2.x - p1.x) * (point.y - p1.y) / (p2.y - p1.y) + p1.x);
             
             if (intersect) inside = !inside;
         }
 
         if (!inside) {
             for (let i = 0; i < points.length; i++) {
+                const j = (i + 1) % points.length;
                 const p1 = points[i];
-                const p2 = points[(i + 1) % points.length];
+                const p2 = points[j];
                 
                 if (p1 && p2) {
                     const distance = this.distanceToSegment(point, p1, p2);
@@ -111,8 +125,6 @@ export class HexagonShape extends BaseShape {
     }
 
     private distanceToSegment(p: Point, a: Point, b: Point): number {
-        if (!a || !b) return Infinity;
-        
         const ab = { x: b.x - a.x, y: b.y - a.y };
         const ap = { x: p.x - a.x, y: p.y - a.y };
         
@@ -137,73 +149,63 @@ export class HexagonShape extends BaseShape {
     getBoundingBox(): BoundingBox {
         const points = this.getPoints();
         
-        if (points.length === 0) {
-            return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-        }
-
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
         for (const p of points) {
-            if (p) {
-                minX = Math.min(minX, p.x);
-                minY = Math.min(minY, p.y);
-                maxX = Math.max(maxX, p.x);
-                maxY = Math.max(maxY, p.y);
+            minX = Math.min(minX, p.x);
+            minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x);
+            maxY = Math.max(maxY, p.y);
+        }
+
+        const padding = this.strokeWidth / 2 + 5;
+        return {
+            minX: minX - padding,
+            minY: minY - padding,
+            maxX: maxX + padding,
+            maxY: maxY + padding,
+        };
+    }
+
+    render(ctx: CanvasRenderingContext2D): void {
+        const points = this.getPoints();
+        
+        const validPoints: Point[] = [];
+        for (let i = 0; i < points.length; i++) {
+            const point = points[i];
+            if (point) {
+                validPoints.push(point);
             }
         }
+        
+        if (validPoints.length < 3) return;
 
-        if (minX === Infinity || minY === Infinity || maxX === -Infinity || maxY === -Infinity) {
-            return {
-                minX: this.position.x - this.radius,
-                minY: this.position.y - this.radius,
-                maxX: this.position.x + this.radius,
-                maxY: this.position.y + this.radius,
-            };
+        ctx.beginPath();
+        
+        const firstPoint = validPoints[0];
+        if (!firstPoint) return;
+        ctx.moveTo(firstPoint.x, firstPoint.y);
+        
+        for (let i = 1; i < validPoints.length; i++) {
+            const point = validPoints[i];
+            if (point) {
+                ctx.lineTo(point.x, point.y);
+            }
         }
-
-        return { minX, minY, maxX, maxY };
+        
+        ctx.closePath();
+        
+        ctx.globalAlpha = this.fillOpacity;
+        ctx.fillStyle = this.fill;
+        ctx.fill();
+        
+        ctx.globalAlpha = this.strokeOpacity;
+        ctx.strokeStyle = this.stroke;
+        ctx.lineWidth = this.strokeWidth;
+        ctx.stroke();
+        
+        ctx.globalAlpha = 1;
     }
-
-   render(ctx: CanvasRenderingContext2D): void {
-    const points = this.getPoints();
-
-    if (points.length < 3) return;
-
-    ctx.fillStyle = this.fill;
-    ctx.strokeStyle = this.stroke;
-    ctx.lineWidth = this.strokeWidth;
-
-    ctx.beginPath();
-    
-    let firstPoint: Point | null = null;
-    let firstPointIndex = -1;
-    
-    for (let i = 0; i < points.length; i++) {
-        const point = points[i];
-        if (point) {
-            firstPoint = point;
-            firstPointIndex = i;
-            ctx.moveTo(point.x, point.y);
-            break;
-        }
-    }
-    
-    if (!firstPoint) return;
-    
-    for (let i = firstPointIndex + 1; i < points.length; i++) {
-        const point = points[i];
-        if (point) {
-            ctx.lineTo(point.x, point.y);
-        }
-    }
-    
-    // Замыкаем путь к первой точке
-    ctx.lineTo(firstPoint.x, firstPoint.y);
-    
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-}
 
     move(delta: Point): void {
         this.position.x += delta.x;

@@ -1,59 +1,94 @@
-/**
- * Треугольник.
- */
-import { Editable, HideProperties } from '../property';
+import { Editable } from '../property';
 import type { BoundingBox, Point } from '../base';
 import { BaseShape } from '../base';
 import { shapeRegistry } from '../registry';
 
-@HideProperties(['x', 'y'])
 export class TriangleShape extends BaseShape {
     type = 'triangle';
 
-    @Editable({ label: 'Fill', type: 'color' })
+    @Editable({ label: 'Позиция X', type: 'number' })
+    get x(): number {
+        return this.position.x;
+    }
+    set x(value: number) {
+        const delta = value - this.position.x;
+        this.move({ x: delta, y: 0 });
+    }
+
+    @Editable({ label: 'Позиция Y', type: 'number' })
+    get y(): number {
+        return this.position.y;
+    }
+    set y(value: number) {
+        const delta = value - this.position.y;
+        this.move({ x: 0, y: delta });
+    }
+
+    @Editable({ label: 'Ширина', type: 'number', min: 1 })
+    width: number;
+
+    @Editable({ label: 'Высота', type: 'number', min: 1 })
+    height: number;
+
+    @Editable({ label: 'Поворот', type: 'number', min: 0, max: 360, step: 1 })
+    rotation: number;
+
+    @Editable({ label: 'Цвет заливки', type: 'color' })
     fill: string;
 
-    @Editable({ label: 'Stroke', type: 'color' })
+    @Editable({ label: 'Прозрачность заливки', type: 'number', min: 0, max: 1, step: 0.1 })
+    fillOpacity: number;
+
+    @Editable({ label: 'Цвет контура', type: 'color' })
     stroke: string;
 
-    @Editable({
-        label: 'Stroke Width',
-        type: 'number',
-        min: 0.5,
-        max: 20,
-        step: 0.5,
-    })
+    @Editable({ label: 'Прозрачность контура', type: 'number', min: 0, max: 1, step: 0.1 })
+    strokeOpacity: number;
+
+    @Editable({ label: 'Толщина контура', type: 'number', min: 0.5, max: 20, step: 0.5 })
     strokeWidth: number;
-
-    @Editable({ label: 'Width', type: 'number', min: 10, max: 500 })
-    width: number = 80;
-
-    @Editable({ label: 'Height', type: 'number', min: 10, max: 500 })
-    height: number = 80;
 
     constructor(
         id: string,
         position: Point,
         width: number = 80,
         height: number = 80,
+        rotation: number = 0,
         fill: string = 'transparent',
+        fillOpacity: number = 1,
         stroke: string = '#000000',
+        strokeOpacity: number = 1,
         strokeWidth: number = 2
     ) {
         super(id, position);
         this.width = width;
         this.height = height;
+        this.rotation = rotation;
         this.fill = fill;
+        this.fillOpacity = fillOpacity;
         this.stroke = stroke;
+        this.strokeOpacity = strokeOpacity;
         this.strokeWidth = strokeWidth;
     }
 
     private getVertices(): Point[] {
-        return [
-            { x: this.position.x - this.width / 2, y: this.position.y + this.height / 2 }, // лево-низ
-            { x: this.position.x + this.width / 2, y: this.position.y + this.height / 2 }, // право-низ
-            { x: this.position.x, y: this.position.y - this.height / 2 } // верх
+        const rotationRad = (this.rotation * Math.PI) / 180;
+        const cos = Math.cos(rotationRad);
+        const sin = Math.sin(rotationRad);
+        
+        const halfW = this.width / 2;
+        const halfH = this.height / 2;
+        
+        const localPoints = [
+            { x: 0, y: -halfH },
+            { x: -halfW, y: halfH },
+            { x: halfW, y: halfH }
         ];
+        
+        return localPoints.map(p => ({
+            x: this.position.x + p.x * cos - p.y * sin,
+            y: this.position.y + p.x * sin + p.y * cos
+        }));
     }
 
     hitTest(point: Point): boolean {
@@ -144,20 +179,22 @@ export class TriangleShape extends BaseShape {
         
         if (!p1 || !p2 || !p3) return;
 
-        ctx.fillStyle = this.fill;
-        ctx.strokeStyle = this.stroke;
-        ctx.lineWidth = this.strokeWidth;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
         ctx.lineTo(p3.x, p3.y);
         ctx.closePath();
         
+        ctx.globalAlpha = this.fillOpacity;
+        ctx.fillStyle = this.fill;
         ctx.fill();
+        
+        ctx.globalAlpha = this.strokeOpacity;
+        ctx.strokeStyle = this.stroke;
+        ctx.lineWidth = this.strokeWidth;
         ctx.stroke();
+        
+        ctx.globalAlpha = 1;
     }
 
     move(delta: Point): void {

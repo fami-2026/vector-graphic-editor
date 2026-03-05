@@ -7,7 +7,7 @@ import { PolygonShape } from '@/canvas/types/polygon/polygon';
 import { CurveShape } from '@/canvas/types/curve/curve';
 
 interface CurveDrawingState {
-    points: Point[];  
+    points: Point[];
 }
 
 export const useCanvasStore = defineStore('canvas', () => {
@@ -17,8 +17,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     const curveDrawing = ref<CurveDrawingState | null>(null);
     const tempCurve = ref<any | null>(null);
     const showCurveDialog = ref(false);
-    const isEditingExisting = ref(false); 
-    const editingCurveId = ref<string | null>(null); 
+    const isEditingExisting = ref(false);
+    const editingCurveId = ref<string | null>(null);
 
     const selectedShape = computed(
         () => shapes.value.find((s) => s.id === selectedId.value) ?? null
@@ -68,6 +68,7 @@ export const useCanvasStore = defineStore('canvas', () => {
                     cp2X: start.x + 2 * dx / 3 + offsetX,
                     cp2Y: start.y + 2 * dy / 3 + offsetY,
                     stroke: '#000000',
+                    strokeOpacity: 1,
                     strokeWidth: 2,
                     bendCount: 0,
                     originalStartX: start.x,
@@ -105,6 +106,7 @@ export const useCanvasStore = defineStore('canvas', () => {
                         c.cp2X - c.offsetX,
                         c.cp2Y - c.offsetY,
                         c.stroke,
+                        c.strokeOpacity,
                         c.strokeWidth
                     );
                     
@@ -124,6 +126,7 @@ export const useCanvasStore = defineStore('canvas', () => {
                     c.cp2X - c.offsetX,
                     c.cp2Y - c.offsetY,
                     c.stroke,
+                    c.strokeOpacity,
                     c.strokeWidth
                 );
                 
@@ -147,59 +150,63 @@ export const useCanvasStore = defineStore('canvas', () => {
         editingCurveId.value = null;
     }
 
-function editCurve(curve: any) {
-    const centerX = 250;
-    const centerY = 150;
-    
-    const offsetX = centerX - (curve.startX + curve.endX) / 2;
-    const offsetY = centerY - (curve.startY + curve.endY) / 2;
-    
-    const editableCurve = {
-        id: curve.id,
-        startX: curve.startX + offsetX,
-        startY: curve.startY + offsetY,
-        endX: curve.endX + offsetX,
-        endY: curve.endY + offsetY,
-        cp1X: curve.cp1X + offsetX,
-        cp1Y: curve.cp1Y + offsetY,
-        cp2X: curve.cp2X + offsetX,
-        cp2Y: curve.cp2Y + offsetY,
-        stroke: curve.stroke,
-        strokeWidth: curve.strokeWidth,
-        bendCount: curve.bendCount || 0,
-        originalStartX: curve.startX,
-        originalStartY: curve.startY,
-        originalEndX: curve.endX,
-        originalEndY: curve.endY,
-        offsetX: offsetX,
-        offsetY: offsetY
-    };
-    
-    tempCurve.value = editableCurve;
-    isEditingExisting.value = true;
-    editingCurveId.value = curve.id;
-    showCurveDialog.value = true;
-}
+    function editCurve(curve: any) {
+        const centerX = 250;
+        const centerY = 150;
+        
+        const offsetX = centerX - (curve.startX + curve.endX) / 2;
+        const offsetY = centerY - (curve.startY + curve.endY) / 2;
+        
+        const editableCurve = {
+            id: curve.id,
+            startX: curve.startX + offsetX,
+            startY: curve.startY + offsetY,
+            endX: curve.endX + offsetX,
+            endY: curve.endY + offsetY,
+            cp1X: curve.cp1X + offsetX,
+            cp1Y: curve.cp1Y + offsetY,
+            cp2X: curve.cp2X + offsetX,
+            cp2Y: curve.cp2Y + offsetY,
+            stroke: curve.stroke,
+            strokeOpacity: curve.strokeOpacity,
+            strokeWidth: curve.strokeWidth,
+            bendCount: curve.bendCount || 0,
+            originalStartX: curve.startX,
+            originalStartY: curve.startY,
+            originalEndX: curve.endX,
+            originalEndY: curve.endY,
+            offsetX: offsetX,
+            offsetY: offsetY
+        };
+        
+        tempCurve.value = editableCurve;
+        isEditingExisting.value = true;
+        editingCurveId.value = curve.id;
+        showCurveDialog.value = true;
+    }
 
     function addShape(type: string, pos: { x: number; y: number }, params?: any) {
-        if (type === 'polygon' && params?.sides) {
-            const shape = new PolygonShape(
-                generateId(),
-                pos,
-                params.sides,
-                50,
-                0,
-                'transparent',
-                '#000000',
-                2
-            );
-            shapes.value.push(shape);
-            return shape;
-        }
-        
-        const shape = shapeRegistry.create(type, generateId(), pos);
+    if (type === 'polygon' && params?.sides) {
+        const shape = new PolygonShape(
+            generateId(),
+            pos,
+            params.sides,        // количество углов
+            100,                  // ширина
+            100,                  // высота
+            0,                    // поворот
+            'transparent',        // цвет заливки
+            1,                    // прозрачность заливки
+            '#000000',            // цвет контура
+            1,                    // прозрачность контура
+            2                     // толщина контура
+        );
         shapes.value.push(shape);
         return shape;
+    }
+    
+    const shape = shapeRegistry.create(type, generateId(), pos);
+    shapes.value.push(shape);
+    return shape;
     }
 
     function updateShape(id: string, updates: Partial<Shape>) {

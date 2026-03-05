@@ -1,41 +1,55 @@
-/**
- * Стрелка.
- */
-import { Editable, HideProperties } from '../property';
+import { Editable } from '../property';
 import type { BoundingBox, Point } from '../base';
 import { BaseShape } from '../base';
 import { shapeRegistry } from '../registry';
 
-@HideProperties(['x', 'y'])
 export class ArrowShape extends BaseShape {
     type = 'arrow';
 
-    @Editable({ label: 'Fill', type: 'color' })
-    fill: string;
+    @Editable({ label: 'Позиция X', type: 'number' })
+    get x(): number {
+        return this.position.x;
+    }
+    set x(value: number) {
+        const delta = value - this.position.x;
+        this.move({ x: delta, y: 0 });
+    }
 
-    @Editable({ label: 'Stroke', type: 'color' })
-    stroke: string;
+    @Editable({ label: 'Позиция Y', type: 'number' })
+    get y(): number {
+        return this.position.y;
+    }
+    set y(value: number) {
+        const delta = value - this.position.y;
+        this.move({ x: 0, y: delta });
+    }
 
-    @Editable({
-        label: 'Stroke Width',
-        type: 'number',
-        min: 0.5,
-        max: 20,
-        step: 0.5,
-    })
-    strokeWidth: number;
-
-    @Editable({ label: 'Length', type: 'number', min: 20, max: 500 })
+    @Editable({ label: 'Длина', type: 'number', min: 20, max: 500 })
     length: number = 150;
 
-    @Editable({ label: 'Head Size', type: 'number', min: 10, max: 100 })
+    @Editable({ label: 'Размер наконечника', type: 'number', min: 10, max: 100 })
     headSize: number = 30;
 
-    @Editable({ label: 'Thickness', type: 'number', min: 5, max: 50 })
+    @Editable({ label: 'Толщина', type: 'number', min: 5, max: 50 })
     thickness: number = 15;
 
-    @Editable({ label: 'Rotation', type: 'number', min: 0, max: 360, step: 1 })
+    @Editable({ label: 'Поворот', type: 'number', min: 0, max: 360, step: 1 })
     rotation: number = 0;
+
+    @Editable({ label: 'Цвет заливки', type: 'color' })
+    fill: string;
+
+    @Editable({ label: 'Прозрачность заливки', type: 'number', min: 0, max: 1, step: 0.1 })
+    fillOpacity: number = 1;
+
+    @Editable({ label: 'Цвет контура', type: 'color' })
+    stroke: string;
+
+    @Editable({ label: 'Прозрачность контура', type: 'number', min: 0, max: 1, step: 0.1 })
+    strokeOpacity: number = 1;
+
+    @Editable({ label: 'Толщина контура', type: 'number', min: 0.5, max: 20, step: 0.5 })
+    strokeWidth: number;
 
     constructor(
         id: string,
@@ -45,7 +59,9 @@ export class ArrowShape extends BaseShape {
         thickness: number = 15,
         rotation: number = 0,
         fill: string = 'transparent',
+        fillOpacity: number = 1,
         stroke: string = '#000000',
+        strokeOpacity: number = 1,
         strokeWidth: number = 2
     ) {
         super(id, position);
@@ -54,7 +70,9 @@ export class ArrowShape extends BaseShape {
         this.thickness = thickness;
         this.rotation = rotation;
         this.fill = fill;
+        this.fillOpacity = fillOpacity;
         this.stroke = stroke;
+        this.strokeOpacity = strokeOpacity;
         this.strokeWidth = strokeWidth;
     }
 
@@ -113,7 +131,7 @@ export class ArrowShape extends BaseShape {
             }
         }
 
-        return false;
+        return inside;
     }
 
     private distanceToSegment(p: Point, a: Point, b: Point): number {
@@ -160,42 +178,44 @@ export class ArrowShape extends BaseShape {
     }
 
     render(ctx: CanvasRenderingContext2D): void {
-    const points = this.getArrowPoints();
-    
-    const validPoints: Point[] = [];
-    for (let i = 0; i < points.length; i++) {
-        const point = points[i];
-        if (point) {
-            validPoints.push(point);
+        const points = this.getArrowPoints();
+        
+        const validPoints: Point[] = [];
+        for (let i = 0; i < points.length; i++) {
+            const point = points[i];
+            if (point) {
+                validPoints.push(point);
+            }
         }
-    }
-    
-    if (validPoints.length < 3) return;
+        
+        if (validPoints.length < 3) return;
 
-    ctx.fillStyle = this.fill;
-    ctx.strokeStyle = this.stroke;
-    ctx.lineWidth = this.strokeWidth;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-
-    ctx.beginPath();
-    
-    const firstPoint = validPoints[0];
-    if (!firstPoint) return;
-    ctx.moveTo(firstPoint.x, firstPoint.y);
-    
-    for (let i = 1; i < validPoints.length; i++) {
-        const point = validPoints[i];
-        if (point) {
-            ctx.lineTo(point.x, point.y);
+        ctx.beginPath();
+        
+        const firstPoint = validPoints[0];
+        if (!firstPoint) return;
+        ctx.moveTo(firstPoint.x, firstPoint.y);
+        
+        for (let i = 1; i < validPoints.length; i++) {
+            const point = validPoints[i];
+            if (point) {
+                ctx.lineTo(point.x, point.y);
+            }
         }
+        
+        ctx.closePath();
+        
+        ctx.globalAlpha = this.fillOpacity;
+        ctx.fillStyle = this.fill;
+        ctx.fill();
+        
+        ctx.globalAlpha = this.strokeOpacity;
+        ctx.strokeStyle = this.stroke;
+        ctx.lineWidth = this.strokeWidth;
+        ctx.stroke();
+        
+        ctx.globalAlpha = 1;
     }
-    
-    ctx.closePath();
-    
-    ctx.fill();
-    ctx.stroke();
-}
 
     move(delta: Point): void {
         this.position.x += delta.x;
