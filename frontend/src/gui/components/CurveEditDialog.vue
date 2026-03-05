@@ -194,8 +194,6 @@ function onDrag(event: MouseEvent) {
     
     const t = dragT.value;
     
-    const currentPoint = getPointOnCurve(t);
-    
     const dx = bezierDerivative(localCurve.value.startX, localCurve.value.cp1X, localCurve.value.cp2X, localCurve.value.endX, t);
     const dy = bezierDerivative(localCurve.value.startY, localCurve.value.cp1Y, localCurve.value.cp2Y, localCurve.value.endY, t);
     const len = Math.sqrt(dx * dx + dy * dy);
@@ -302,10 +300,6 @@ function confirm() {
 
 function cancel() {
     emit('cancel');
-}
-
-function getPointColor(type: PointType): string {
-    return '#2196F3';
 }
 
 function getCurvePath(): string {

@@ -93,7 +93,7 @@ function handleToolClick(tool: ToolConfig) {
     }
 }
 
-function addShape(type: ShapeType, customParams?: any)  {
+function addShape(type: ShapeType, customParams?: Record<string, unknown>) {
     canvasStore.addShape(type, { x: 400, y: 300 }, customParams);
     toolsStore.setActiveTool('select');
 }
