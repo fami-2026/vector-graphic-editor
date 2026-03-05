@@ -28,46 +28,96 @@
             </div>
 
             <!-- Размер: 2 поля -->
-            <div class="fieldBlock">
-                <div class="fieldLabel">Размер</div>
-                <div class="grid2">
-                    <input
-                        class="fieldInput"
-                        type="number"
-                        aria-label="Width"
-                        :value="shapeWidth"
-                        :disabled="!selectedShape"
-                        min="1"
-                        @input="onNumberChange('width', $event)"
-                    />
-                    <input
-                        class="fieldInput"
-                        type="number"
-                        aria-label="Height"
-                        :value="shapeHeight"
-                        :disabled="!selectedShape"
-                        min="1"
-                        @input="onNumberChange('height', $event)"
-                    />
+            <div v-if="selectedShape?.type !== 'line'" class="fieldBlock">
+                <div class="fieldBlock">
+                    <div class="fieldLabel">Размер</div>
+                    <div class="grid2">
+                        <input
+                            class="fieldInput"
+                            type="number"
+                            aria-label="Width"
+                            :value="shapeWidth"
+                            :disabled="!selectedShape"
+                            min="1"
+                            @input="onNumberChange('width', $event)"
+                        />
+                        <input
+                            class="fieldInput"
+                            type="number"
+                            aria-label="Height"
+                            :value="shapeHeight"
+                            :disabled="!selectedShape"
+                            min="1"
+                            @input="onNumberChange('height', $event)"
+                        />
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Поворот -->
+        <!-- Масштаб -->
         <div class="fieldBlock">
-            <div class="fieldLabel">Поворот</div>
+            <div class="fieldLabel">Масштаб</div>
             <div class="grid2">
                 <input
                     class="fieldInput"
                     type="number"
-                    aria-label="Rotation"
-                    :value="selectedShape?.rotation ?? ''"
+                    aria-label="Scale"
+                    :value="selectedShape?.scaleX ?? ''"
                     :disabled="!selectedShape"
-                    min="0"
-                    max="360"
-                    @input="onNumberChange('rotation', $event)"
+                    min="-10"
+                    max="10"
+                    @input="onNumberChange('scaleX', $event)"
                 />
-                <div class="spacer" aria-hidden="true" />
+                <input
+                    class="fieldInput"
+                    type="number"
+                    aria-label="Height"
+                    :value="selectedShape?.scaleY ?? ''"
+                    :disabled="!selectedShape"
+                    min="-10"
+                    max="10"
+                    @input="onNumberChange('scaleY', $event)"
+                />
+            </div>
+            <div class="fieldLabel">Отражение</div>
+            <div class="grid2" style="margin-top: 4px">
+                <button
+                    class="iconBtnSmall"
+                    :disabled="!selectedShape"
+                    @click="onFlip('scaleX')"
+                    title="Отразить по горизонтали"
+                >
+                    <span style="transform: scaleX(-1)">⇄</span>
+                </button>
+                <button
+                    class="iconBtnSmall"
+                    :disabled="!selectedShape"
+                    @click="onFlip('scaleY')"
+                    title="Отразить по вертикали"
+                >
+                    <span style="transform: rotate(90deg) scaleX(-1)">⇄</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Поворот -->
+        <div v-if="selectedShape?.type !== 'line'" class="fieldBlock">
+            <div class="fieldBlock">
+                <div class="fieldLabel">Поворот</div>
+                <div class="grid2">
+                    <input
+                        class="fieldInput"
+                        type="number"
+                        aria-label="Rotation"
+                        :value="selectedShape?.rotation ?? ''"
+                        :disabled="!selectedShape"
+                        min="0"
+                        max="360"
+                        @input="onNumberChange('rotation', $event)"
+                    />
+                    <div class="spacer" aria-hidden="true" />
+                </div>
             </div>
         </div>
 
@@ -252,7 +302,9 @@ type NumberFieldKey =
     | 'width'
     | 'height'
     | 'rotation'
-    | 'strokeWidth';
+    | 'strokeWidth'
+    | 'scaleX'
+    | 'scaleY';
 
 function onNumberChange(key: NumberFieldKey, event: Event) {
     if (!selectedShape.value) return;
@@ -263,6 +315,24 @@ function onNumberChange(key: NumberFieldKey, event: Event) {
     canvasStore.updateShape(selectedShape.value.id, {
         [key]: value,
     } as Partial<Shape>);
+}
+
+function onFlip(key: 'scaleX' | 'scaleY') {
+    if (!selectedShape.value) return;
+
+    const currentScale = Number((selectedShape.value as Partial<Shape>)[key]);
+    const currentRotation = selectedShape.value.rotation;
+
+    const newRotation =
+        key === 'scaleX'
+            ? (360 - currentRotation) % 360
+            : (180 - currentRotation + 360) % 360;
+
+    canvasStore.updateShape(selectedShape.value.id, {
+        [key]: currentScale * -1,
+        rotation:
+            selectedShape.value.type === 'line' ? currentRotation : newRotation,
+    });
 }
 
 type ColorFieldKey = 'fill' | 'stroke';
@@ -525,5 +595,36 @@ function onLayerDrop(targetIndex: number, event: DragEvent) {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.iconBtnSmall {
+    width: 100%;
+    height: 24px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    color: #374151;
+    transition: all 0.2s;
+}
+
+.iconBtnSmall:hover:not(:disabled) {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.iconBtnSmall:active:not(:disabled) {
+    background: #e5e7eb;
+    transform: translateY(1px);
+}
+
+.iconBtnSmall:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f9fafb;
 }
 </style>

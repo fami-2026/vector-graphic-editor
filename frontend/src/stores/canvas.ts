@@ -6,7 +6,6 @@ import { generateId } from '@/canvas/utils/math';
 import { PolygonShape } from '@/canvas/types/polygon/polygon';
 import { CurveShape } from '@/canvas/types/curve/curve';
 
-// Интерфейс для временной кривой
 interface EditableCurve {
     id?: string;
     startX: number;
@@ -29,7 +28,6 @@ interface EditableCurve {
     offsetY?: number;
 }
 
-// Интерфейс для параметров фигур
 interface ShapeParams extends Record<string, unknown> {
     sides?: number;
     width?: number;
@@ -47,6 +45,22 @@ interface CurveDrawingState {
     points: Point[];
 }
 
+type SerializedShapeBase = {
+    type: string;
+    id: string;
+    position: { x: number; y: number };
+    rotation: number;
+    scaleX: number;
+    scaleY: number;
+};
+
+type SerializedShape = SerializedShapeBase & Record<string, unknown>;
+
+type SceneSnapshot = {
+    shapes: SerializedShape[];
+    selectedId: string | null;
+};
+
 export const useCanvasStore = defineStore('canvas', () => {
     const shapes = ref<Shape[]>([]);
     const selectedId = ref<string | null>(null);
@@ -56,6 +70,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     const showCurveDialog = ref(false);
     const isEditingExisting = ref(false);
     const editingCurveId = ref<string | null>(null);
+
+    const undoStack = ref<SceneSnapshot[]>([]);
+    const redoStack = ref<SceneSnapshot[]>([]);
+    const isInteractionActive = ref(false);
+    const HISTORY_LIMIT = 50;
+
+    let isContinuousChangeActive = false;
+    let continuousChangeTimer: number | null = null;
+    const CONTINUOUS_CHANGE_TIMEOUT = 700;
 
     const selectedShape = computed(
         () => shapes.value.find((s) => s.id === selectedId.value) ?? null
@@ -69,9 +92,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function handleCanvasClick(x: number, y: number) {
         if (!curveDrawing.value) return;
-
         curveDrawing.value.points.push({ x, y });
-
         if (curveDrawing.value.points.length === 2) {
             createStraightCurve();
         }
@@ -79,22 +100,17 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function createStraightCurve() {
         if (!curveDrawing.value) return;
-
         if (curveDrawing.value.points.length === 2) {
             const points = curveDrawing.value.points;
             const start = points[0];
             const end = points[1];
-
             if (start && end) {
                 const dx = end.x - start.x;
                 const dy = end.y - start.y;
-
                 const centerX = 250;
                 const centerY = 150;
-
                 const offsetX = centerX - (start.x + end.x) / 2;
                 const offsetY = centerY - (start.y + end.y) / 2;
-
                 const curve: EditableCurve = {
                     startX: start.x + offsetX,
                     startY: start.y + offsetY,
@@ -115,7 +131,6 @@ export const useCanvasStore = defineStore('canvas', () => {
                     offsetX: offsetX,
                     offsetY: offsetY,
                 };
-
                 tempCurve.value = curve;
                 isEditingExisting.value = false;
                 editingCurveId.value = null;
@@ -127,7 +142,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     function confirmCurve() {
         if (tempCurve.value) {
             const c = tempCurve.value;
-
             if (isEditingExisting.value && editingCurveId.value) {
                 const index = shapes.value.findIndex(
                     (s) => s.id === editingCurveId.value
@@ -156,7 +170,6 @@ export const useCanvasStore = defineStore('canvas', () => {
                         c.strokeOpacity,
                         c.strokeWidth
                     );
-
                     updatedCurve.bendCount = c.bendCount;
                     shapes.value.splice(index, 1, updatedCurve);
                 }
@@ -183,11 +196,9 @@ export const useCanvasStore = defineStore('canvas', () => {
                     c.strokeOpacity,
                     c.strokeWidth
                 );
-
                 curve.bendCount = c.bendCount;
                 shapes.value.push(curve);
             }
-
             tempCurve.value = null;
         }
         curveDrawing.value = null;
@@ -207,10 +218,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     function editCurve(curve: EditableCurve) {
         const centerX = 250;
         const centerY = 150;
-
         const offsetX = centerX - (curve.startX + curve.endX) / 2;
         const offsetY = centerY - (curve.startY + curve.endY) / 2;
-
         const editableCurve: EditableCurve = {
             id: curve.id,
             startX: curve.startX + offsetX,
@@ -232,18 +241,97 @@ export const useCanvasStore = defineStore('canvas', () => {
             offsetX: offsetX,
             offsetY: offsetY,
         };
-
         tempCurve.value = editableCurve;
         isEditingExisting.value = true;
         editingCurveId.value = curve.id || null;
         showCurveDialog.value = true;
     }
 
-    function addShape(
-        type: string,
-        pos: { x: number; y: number },
-        params?: ShapeParams
-    ) {
+    function serializeShape(shape: Shape): SerializedShape {
+        const plain = JSON.parse(JSON.stringify(shape)) as SerializedShape;
+        plain.type = (shape as unknown as { type: string }).type;
+        plain.id = shape.id;
+        plain.position = { x: shape.position.x, y: shape.position.y };
+        plain.rotation = shape.rotation;
+        plain.scaleX = shape.scaleX;
+        plain.scaleY = shape.scaleY;
+        return plain;
+    }
+
+    function createSnapshot(): SceneSnapshot {
+        return {
+            shapes: shapes.value.map((s) => serializeShape(s)),
+            selectedId: selectedId.value,
+        };
+    }
+
+    function restoreSnapshot(snapshot: SceneSnapshot) {
+        const restored: Shape[] = snapshot.shapes.map((plain) => {
+            const { type, id, position, ...rest } = plain;
+            const shape = shapeRegistry.create(type, id, position);
+            Object.assign(shape, rest);
+            return shape as Shape;
+        });
+        shapes.value = restored;
+        selectedId.value = snapshot.selectedId;
+    }
+
+    function pushHistory() {
+        const snapshot = createSnapshot();
+        undoStack.value.push(snapshot);
+        if (undoStack.value.length > HISTORY_LIMIT) {
+            undoStack.value.shift();
+        }
+        redoStack.value = [];
+    }
+
+    function startInteraction() {
+        if (!isInteractionActive.value) {
+            pushHistory();
+            isInteractionActive.value = true;
+        }
+    }
+
+    function endInteraction() {
+        isInteractionActive.value = false;
+    }
+
+    function ensureHistoryForContinuousChange() {
+        if (isInteractionActive.value) return;
+        if (!isContinuousChangeActive) {
+            pushHistory();
+            isContinuousChangeActive = true;
+        }
+        if (continuousChangeTimer !== null) {
+            window.clearTimeout(continuousChangeTimer);
+        }
+        continuousChangeTimer = window.setTimeout(() => {
+            isContinuousChangeActive = false;
+            continuousChangeTimer = null;
+        }, CONTINUOUS_CHANGE_TIMEOUT);
+    }
+
+    function undo() {
+        const snapshot = undoStack.value.pop();
+        if (!snapshot) return;
+        const current = createSnapshot();
+        redoStack.value.push(current);
+        restoreSnapshot(snapshot);
+    }
+
+    function redo() {
+        const snapshot = redoStack.value.pop();
+        if (!snapshot) return;
+        const current = createSnapshot();
+        undoStack.value.push(current);
+        restoreSnapshot(snapshot);
+    }
+
+    const canUndo = computed(() => undoStack.value.length > 0);
+    const canRedo = computed(() => redoStack.value.length > 0);
+
+    function addShape(type: string, pos: { x: number; y: number }, params?: ShapeParams) {
+        pushHistory();
         if (type === 'polygon' && params?.sides) {
             const shape = new PolygonShape(
                 generateId(),
@@ -261,13 +349,13 @@ export const useCanvasStore = defineStore('canvas', () => {
             shapes.value.push(shape);
             return shape;
         }
-
         const shape = shapeRegistry.create(type, generateId(), pos);
         shapes.value.push(shape);
         return shape;
     }
 
     function updateShape(id: string, updates: Partial<Shape>) {
+        ensureHistoryForContinuousChange();
         const shape = shapes.value.find((s) => s.id === id);
         if (shape) {
             Object.assign(shape, updates);
@@ -276,6 +364,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function deleteShape(id: string) {
+        pushHistory();
         shapes.value = shapes.value.filter((s) => s.id !== id);
         if (selectedId.value === id) selectedId.value = null;
     }
@@ -289,8 +378,12 @@ export const useCanvasStore = defineStore('canvas', () => {
         ) {
             return;
         }
+        pushHistory();
         const next = [...shapes.value];
         const [item] = next.splice(fromIndex, 1);
+        if (!item) {
+            return;
+        }
         next.splice(toIndex, 0, item);
         shapes.value = next;
     }
@@ -319,5 +412,11 @@ export const useCanvasStore = defineStore('canvas', () => {
         deleteShape,
         selectShape,
         moveShape,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
+        startInteraction,
+        endInteraction,
     };
 });

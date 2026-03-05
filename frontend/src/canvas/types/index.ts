@@ -10,6 +10,7 @@ export { StarShape } from './star';
 export { ArrowShape } from './arrow';
 export { HexagonShape } from './hexagon';
 export { shapeRegistry } from './registry';
+export { SELECTION_PADDING } from './base';
 
 export type Shape = import('./base').BaseShape;
 export type ShapeType = string;
