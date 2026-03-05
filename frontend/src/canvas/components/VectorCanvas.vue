@@ -4,34 +4,18 @@ import { storeToRefs } from 'pinia';
 import { useCanvasStore } from '@/stores/canvas';
 import { useCanvasRender } from '@/canvas/composables/useCanvasRender';
 import { useInteractions } from '@/canvas/composables/useInteractions';
-import CurveEditDialog from '@/gui/components/CurveEditDialog.vue';
 
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-const canvasStore = useCanvasStore();
-const { shapes, selectedId, showCurveDialog, tempCurve } =
-    storeToRefs(canvasStore);
+const { shapes, selectedId } = storeToRefs(useCanvasStore());
 
 const { draw } = useCanvasRender(canvasRef, shapes, selectedId);
 const { attachListeners } = useInteractions(canvasRef, shapes);
 
 let resizeObserver: ResizeObserver | null = null;
 let detachListeners: (() => void) | undefined;
-interface CurveShapeData {
-    id: string;
-    startX: number;
-    startY: number;
-    endX: number;
-    endY: number;
-    cp1X: number;
-    cp1Y: number;
-    cp2X: number;
-    cp2Y: number;
-    stroke: string;
-    strokeWidth: number;
-    bendCount?: number;
-}
+
 const updateCanvasSize = () => {
     if (!containerRef.value || !canvasRef.value) return;
 
@@ -47,51 +31,6 @@ const updateCanvasSize = () => {
     }
 };
 
-const handleCanvasClick = (e: MouseEvent) => {
-    if (!canvasRef.value) return;
-
-    const rect = canvasRef.value.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (canvasStore.curveDrawing) {
-        canvasStore.handleCanvasClick(x, y);
-        e.stopPropagation();
-    }
-};
-
-const handleCanvasDoubleClick = (e: MouseEvent) => {
-    if (!canvasRef.value) return;
-
-    const rect = canvasRef.value.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    for (const shape of canvasStore.shapes) {
-        if (shape.type === 'curve' && shape.hitTest({ x, y })) {
-            const s = shape as unknown as CurveShapeData;
-
-            const editableCurve = {
-                id: s.id,
-                startX: s.startX,
-                startY: s.startY,
-                endX: s.endX,
-                endY: s.endY,
-                cp1X: s.cp1X,
-                cp1Y: s.cp1Y,
-                cp2X: s.cp2X,
-                cp2Y: s.cp2Y,
-                stroke: s.stroke,
-                strokeWidth: s.strokeWidth,
-                bendCount: s.bendCount || 0,
-            };
-
-            canvasStore.editCurve(editableCurve);
-            break;
-        }
-    }
-};
-
 onMounted(() => {
     if (containerRef.value) {
         resizeObserver = new ResizeObserver(updateCanvasSize);
@@ -100,23 +39,12 @@ onMounted(() => {
 
     detachListeners = attachListeners();
 
-    if (canvasRef.value) {
-        canvasRef.value.addEventListener('click', handleCanvasClick);
-        canvasRef.value.addEventListener('dblclick', handleCanvasDoubleClick);
-    }
 });
 
 onUnmounted(() => {
     resizeObserver?.disconnect();
     detachListeners?.();
 
-    if (canvasRef.value) {
-        canvasRef.value.removeEventListener('click', handleCanvasClick);
-        canvasRef.value.removeEventListener(
-            'dblclick',
-            handleCanvasDoubleClick
-        );
-    }
 });
 
 watch([shapes, selectedId], () => requestAnimationFrame(draw), { deep: true });
@@ -125,13 +53,6 @@ watch([shapes, selectedId], () => requestAnimationFrame(draw), { deep: true });
 <template>
     <div ref="containerRef" class="canvas-wrapper">
         <canvas ref="canvasRef" class="main-canvas"></canvas>
-
-        <CurveEditDialog
-            v-model:show="showCurveDialog"
-            :curve="tempCurve"
-            @confirm="canvasStore.confirmCurve()"
-            @cancel="canvasStore.cancelCurveDrawing()"
-        />
     </div>
 </template>
 

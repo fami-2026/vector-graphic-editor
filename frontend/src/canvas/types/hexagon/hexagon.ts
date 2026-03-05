@@ -89,6 +89,11 @@ export class HexagonShape extends BaseShape {
         this.strokeWidth = strokeWidth;
     }
 
+    setSize(width: number, height: number): void {
+        this.width = width;
+        this.height = height;
+    }
+
     private getPoints(): Point[] {
         const points: Point[] = [];
         const angleStep = (Math.PI * 2) / 6;
@@ -187,6 +192,17 @@ export class HexagonShape extends BaseShape {
             minY: minY - padding,
             maxX: maxX + padding,
             maxY: maxY + padding,
+        };
+    }
+
+    getLocalBox(): BoundingBox {
+        const halfW = this.width / 2;
+        const halfH = this.height / 2;
+        return {
+            minX: -halfW,
+            minY: -halfH,
+            maxX: halfW,
+            maxY: halfH,
         };
     }
 

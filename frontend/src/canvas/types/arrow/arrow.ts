@@ -6,6 +6,10 @@ import { shapeRegistry } from '../registry';
 export class ArrowShape extends BaseShape {
     type = 'arrow';
 
+    flipY = () => {
+        this.scaleY *= -1;
+    };
+
     @Editable({ label: 'Позиция X', type: 'number' })
     get x(): number {
         return this.position.x;
@@ -99,15 +103,17 @@ export class ArrowShape extends BaseShape {
         this.strokeWidth = strokeWidth;
     }
 
-    private getArrowPoints(): Point[] {
-        const angle = (this.rotation * Math.PI) / 180;
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
+    setSize(width: number, height: number): void {
+        this.length = Math.max(20, width);
+        this.thickness = Math.max(5, height);
+        this.headSize = Math.min(this.headSize, this.length);
+    }
 
+    private getLocalArrowPoints(): Point[] {
         const halfThick = this.thickness / 2;
         const headBase = this.length - this.headSize;
 
-        const localPoints = [
+        return [
             { x: 0, y: -halfThick },
             { x: headBase, y: -halfThick },
             { x: headBase, y: -this.headSize },
@@ -116,15 +122,19 @@ export class ArrowShape extends BaseShape {
             { x: headBase, y: halfThick },
             { x: 0, y: halfThick },
         ];
+    }
 
-        return localPoints.map((p) => ({
-            x: this.position.x + p.x * cos - p.y * sin,
-            y: this.position.y + p.x * sin + p.y * cos,
+    private getScaledLocalArrowPoints(): Point[] {
+        const points = this.getLocalArrowPoints();
+        return points.map((p) => ({
+            x: p.x * this.scaleX,
+            y: p.y * this.scaleY,
         }));
     }
 
-    hitTest(point: Point): boolean {
-        const points = this.getArrowPoints();
+    hitTest(globalPoint: Point): boolean {
+        const point = this.toVLocalPoint(globalPoint);
+        const points = this.getScaledLocalArrowPoints();
         const padding = this.strokeWidth / 2 + 3;
 
         let inside = false;
@@ -182,50 +192,51 @@ export class ArrowShape extends BaseShape {
     }
 
     getBoundingBox(): BoundingBox {
-        const points = this.getArrowPoints();
-
-        let minX = Infinity,
-            minY = Infinity,
-            maxX = -Infinity,
-            maxY = -Infinity;
-
-        for (const p of points) {
-            minX = Math.min(minX, p.x);
-            minY = Math.min(minY, p.y);
-            maxX = Math.max(maxX, p.x);
-            maxY = Math.max(maxY, p.y);
-        }
-
-        const padding = this.strokeWidth / 2 + 5;
+        const box = this.getLocalBox();
+        const corners = [
+            this.toGlobalPoint({ x: box.minX, y: box.minY }),
+            this.toGlobalPoint({ x: box.maxX, y: box.minY }),
+            this.toGlobalPoint({ x: box.maxX, y: box.maxY }),
+            this.toGlobalPoint({ x: box.minX, y: box.maxY }),
+        ];
         return {
-            minX: minX - padding,
-            minY: minY - padding,
-            maxX: maxX + padding,
-            maxY: maxY + padding,
+            minX: Math.min(...corners.map((p) => p.x)),
+            minY: Math.min(...corners.map((p) => p.y)),
+            maxX: Math.max(...corners.map((p) => p.x)),
+            maxY: Math.max(...corners.map((p) => p.y)),
+        };
+    }
+
+    getLocalBox(): BoundingBox {
+        const halfThick = this.thickness / 2;
+        const halfHead = this.headSize;
+        return {
+            minX: 0,
+            minY: -Math.max(halfThick, halfHead),
+            maxX: this.length,
+            maxY: Math.max(halfThick, halfHead),
         };
     }
 
     render(ctx: CanvasRenderingContext2D): void {
-        const points = this.getArrowPoints();
+        const points = this.getScaledLocalArrowPoints();
 
-        const validPoints: Point[] = [];
-        for (let i = 0; i < points.length; i++) {
-            const point = points[i];
-            if (point) {
-                validPoints.push(point);
-            }
-        }
+        if (points.length < 3) return;
 
-        if (validPoints.length < 3) return;
+        ctx.save();
+        const m = this.getVMatrix();
+        ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
 
         ctx.beginPath();
-
-        const firstPoint = validPoints[0];
-        if (!firstPoint) return;
+        const firstPoint = points[0];
+        if (!firstPoint) {
+            ctx.restore();
+            return;
+        }
         ctx.moveTo(firstPoint.x, firstPoint.y);
 
-        for (let i = 1; i < validPoints.length; i++) {
-            const point = validPoints[i];
+        for (let i = 1; i < points.length; i++) {
+            const point = points[i];
             if (point) {
                 ctx.lineTo(point.x, point.y);
             }
@@ -243,6 +254,7 @@ export class ArrowShape extends BaseShape {
         ctx.stroke();
 
         ctx.globalAlpha = 1;
+        ctx.restore();
     }
 
     move(delta: Point): void {

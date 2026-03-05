@@ -28,6 +28,7 @@ git
                 class="iconBtn square"
                 type="button"
                 title="Отменить"
+                :disabled="!canUndo"
                 @click="onUndo"
             >
                 <Undo2 :size="16" aria-hidden="true" />
@@ -36,6 +37,7 @@ git
                 class="iconBtn square"
                 type="button"
                 title="Повторить"
+                :disabled="!canRedo"
                 @click="onRedo"
             >
                 <Redo2 :size="16" aria-hidden="true" />
@@ -46,7 +48,9 @@ git
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { storeToRefs } from 'pinia';
 import { Minus, Plus, Undo2, Redo2 } from 'lucide-vue-next';
+import { useCanvasStore } from '@/stores/canvas';
 
 const zoom = ref(60);
 
@@ -62,13 +66,19 @@ function zoomOut() {
     zoom.value = clamp(zoom.value - 10, 10, 500);
 }
 
+const canvasStore = useCanvasStore();
+const { canUndo, canRedo } = storeToRefs(canvasStore);
+
 function onUndo() {
-    // пока undo/redo не реализованы в store, просто заглушка
-    console.log('undo click');
+    if (canUndo.value) {
+        canvasStore.undo();
+    }
 }
 
 function onRedo() {
-    console.log('redo click');
+    if (canRedo.value) {
+        canvasStore.redo();
+    }
 }
 </script>
 

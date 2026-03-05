@@ -1,7 +1,6 @@
 /**
  * Прямоугольник, центрирован в позиции.
  */
-import { Editable } from '../property';
 import type { BoundingBox, Point } from '../base';
 import { BaseShape } from '../base';
 import { shapeRegistry } from '../registry';
@@ -9,43 +8,14 @@ import { shapeRegistry } from '../registry';
 export class RectShape extends BaseShape {
     type = 'rect';
 
-    @Editable({ label: 'Width', type: 'number', min: 1 })
     width: number;
 
-    @Editable({ label: 'Height', type: 'number', min: 1 })
     height: number;
 
-    @Editable({ label: 'Fill', type: 'color' })
     fill: string;
-
-    @Editable({
-        label: 'Fill Opacity',
-        type: 'number',
-        min: 0,
-        max: 1,
-        step: 0.05,
-    })
     fillOpacity: number = 1;
-
-    @Editable({ label: 'Stroke', type: 'color' })
     stroke: string;
-
-    @Editable({
-        label: 'Stroke Opacity',
-        type: 'number',
-        min: 0,
-        max: 1,
-        step: 0.05,
-    })
     strokeOpacity: number = 1;
-
-    @Editable({
-        label: 'Stroke Width',
-        type: 'number',
-        min: 0.5,
-        max: 20,
-        step: 0.5,
-    })
     strokeWidth: number;
 
     /**
@@ -74,46 +44,74 @@ export class RectShape extends BaseShape {
         this.strokeWidth = strokeWidth;
     }
 
-    hitTest(point: Point): boolean {
-        const bbox = this.getBoundingBox();
+    setSize(width: number, height: number): void {
+        this.width = width;
+        this.height = height;
+    }
+
+    hitTest(globalPoint: Point): boolean {
+        const localPoint = this.toVLocalPoint(globalPoint);
+        const padding = this.strokeWidth / 2 + 3;
+        const minHalfHit = 6;
+        const halfW = Math.max(
+            Math.abs(this.width * this.scaleX) / 2,
+            minHalfHit
+        );
+        const halfH = Math.max(
+            Math.abs(this.height * this.scaleY) / 2,
+            minHalfHit
+        );
+
         return (
-            point.x >= bbox.minX &&
-            point.x <= bbox.maxX &&
-            point.y >= bbox.minY &&
-            point.y <= bbox.maxY
+            localPoint.x >= -halfW - padding &&
+            localPoint.x <= halfW + padding &&
+            localPoint.y >= -halfH - padding &&
+            localPoint.y <= halfH + padding
         );
     }
 
+    getLocalBox(): BoundingBox {
+        const halfW = this.width / 2;
+        const halfH = this.height / 2;
+        return { minX: -halfW, minY: -halfH, maxX: halfW, maxY: halfH };
+    }
+
     getBoundingBox(): BoundingBox {
+        const localBox = this.getLocalBox();
+        const corners = [
+            this.toGlobalPoint({ x: localBox.minX, y: localBox.minY }),
+            this.toGlobalPoint({ x: localBox.maxX, y: localBox.minY }),
+            this.toGlobalPoint({ x: localBox.maxX, y: localBox.maxY }),
+            this.toGlobalPoint({ x: localBox.minX, y: localBox.maxY }),
+        ];
+
         return {
-            minX: this.position.x - this.width / 2,
-            minY: this.position.y - this.height / 2,
-            maxX: this.position.x + this.width / 2,
-            maxY: this.position.y + this.height / 2,
+            minX: Math.min(...corners.map((p) => p.x)),
+            minY: Math.min(...corners.map((p) => p.y)),
+            maxX: Math.max(...corners.map((p) => p.x)),
+            maxY: Math.max(...corners.map((p) => p.y)),
         };
     }
 
     render(ctx: CanvasRenderingContext2D): void {
-        const x = this.position.x - this.width / 2;
-        const y = this.position.y - this.height / 2;
-
-        // Заливка
         ctx.save();
+        const m = this.getVMatrix();
+        const w = Math.abs(this.width * this.scaleX);
+        const h = Math.abs(this.height * this.scaleY);
+
+        ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+        ctx.scale(Math.sign(this.scaleX), Math.sign(this.scaleY));
+
+        const alpha = ctx.globalAlpha;
         ctx.fillStyle = this.fill;
-        if (typeof this.fillOpacity === 'number') {
-            ctx.globalAlpha = this.fillOpacity;
-        }
-        ctx.fillRect(x, y, this.width, this.height);
-        ctx.restore();
+        ctx.globalAlpha = this.fillOpacity;
+        ctx.fillRect(-w / 2, -h / 2, w, h);
 
-        // Обводка
-        ctx.save();
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
-        if (typeof this.strokeOpacity === 'number') {
-            ctx.globalAlpha = this.strokeOpacity;
-        }
-        ctx.strokeRect(x, y, this.width, this.height);
+        ctx.globalAlpha = this.strokeOpacity;
+        ctx.strokeRect(-w / 2, -h / 2, w, h);
+        ctx.globalAlpha = alpha;
         ctx.restore();
     }
 
@@ -122,5 +120,4 @@ export class RectShape extends BaseShape {
         this.position.y += delta.y;
     }
 }
-
 shapeRegistry.register('rect', RectShape);

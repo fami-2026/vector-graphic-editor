@@ -77,12 +77,6 @@ const tools: ToolConfig[] = [
         title: 'Стрелка',
         action: () => addShape('arrow'),
     },
-    {
-        id: 'curve',
-        icon: '〰️',
-        title: 'Кривая',
-        action: () => addShape('curve'),
-    },
 ];
 
 function handleToolClick(tool: ToolConfig) {

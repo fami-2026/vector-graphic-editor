@@ -1,7 +1,6 @@
 /**
  * Круг или эллипс.
  */
-import { Editable } from '../property';
 import type { BoundingBox, Point } from '../base';
 import { BaseShape } from '../base';
 import { shapeRegistry } from '../registry';
@@ -9,43 +8,13 @@ import { shapeRegistry } from '../registry';
 export class CircleShape extends BaseShape {
     type = 'circle';
 
-    @Editable({ label: 'Radius X', type: 'number', min: 1 })
     radiusX: number;
-
-    @Editable({ label: 'Radius Y', type: 'number', min: 1 })
     radiusY: number;
 
-    @Editable({ label: 'Fill', type: 'color' })
     fill: string;
-
-    @Editable({
-        label: 'Fill Opacity',
-        type: 'number',
-        min: 0,
-        max: 1,
-        step: 0.05,
-    })
     fillOpacity: number = 1;
-
-    @Editable({ label: 'Stroke', type: 'color' })
     stroke: string;
-
-    @Editable({
-        label: 'Stroke Opacity',
-        type: 'number',
-        min: 0,
-        max: 1,
-        step: 0.05,
-    })
     strokeOpacity: number = 1;
-
-    @Editable({
-        label: 'Stroke Width',
-        type: 'number',
-        min: 0.5,
-        max: 20,
-        step: 0.5,
-    })
     strokeWidth: number;
 
     /**
@@ -74,64 +43,90 @@ export class CircleShape extends BaseShape {
         this.strokeWidth = strokeWidth;
     }
 
-    hitTest(point: Point): boolean {
-        const dx = point.x - this.position.x;
-        const dy = point.y - this.position.y;
+    get width(): number {
+        return this.radiusX * 2;
+    }
+    set width(v: number) {
+        this.radiusX = v / 2;
+    }
 
+    get height(): number {
+        return this.radiusY * 2;
+    }
+    set height(v: number) {
+        this.radiusY = v / 2;
+    }
+
+    setSize(width: number, height: number): void {
+        this.width = width;
+        this.height = height;
+    }
+
+    hitTest(globalPoint: Point): boolean {
+        const localPoint = this.toVLocalPoint(globalPoint);
         const padding = this.strokeWidth / 2 + 3;
-        const rX = this.radiusX + padding;
-        const rY = this.radiusY + padding;
+        const minRadiusHit = 6;
+        const rX =
+            Math.max(Math.abs((this.width / 2) * this.scaleX), minRadiusHit) +
+            padding;
+        const rY =
+            Math.max(Math.abs((this.height / 2) * this.scaleY), minRadiusHit) +
+            padding;
 
-        return (dx / rX) * (dx / rX) + (dy / rY) * (dy / rY) <= 1;
+        return (
+            (localPoint.x * localPoint.x) / (rX * rX) +
+                (localPoint.y * localPoint.y) / (rY * rY) <=
+            1
+        );
+    }
+
+    getLocalBox(): BoundingBox {
+        return {
+            minX: -this.radiusX,
+            minY: -this.radiusY,
+            maxX: this.radiusX,
+            maxY: this.radiusY,
+        };
     }
 
     getBoundingBox(): BoundingBox {
+        const localBox = this.getLocalBox();
+        const corners = [
+            this.toGlobalPoint({ x: localBox.minX, y: localBox.minY }),
+            this.toGlobalPoint({ x: localBox.maxX, y: localBox.minY }),
+            this.toGlobalPoint({ x: localBox.maxX, y: localBox.maxY }),
+            this.toGlobalPoint({ x: localBox.minX, y: localBox.maxY }),
+        ];
+
         return {
-            minX: this.position.x - this.radiusX,
-            minY: this.position.y - this.radiusY,
-            maxX: this.position.x + this.radiusX,
-            maxY: this.position.y + this.radiusY,
+            minX: Math.min(...corners.map((p) => p.x)),
+            minY: Math.min(...corners.map((p) => p.y)),
+            maxX: Math.max(...corners.map((p) => p.x)),
+            maxY: Math.max(...corners.map((p) => p.y)),
         };
     }
 
     render(ctx: CanvasRenderingContext2D): void {
-        // Заливка
         ctx.save();
-        ctx.fillStyle = this.fill;
-        if (typeof this.fillOpacity === 'number') {
-            ctx.globalAlpha = this.fillOpacity;
-        }
-        ctx.beginPath();
-        ctx.ellipse(
-            this.position.x,
-            this.position.y,
-            this.radiusX,
-            this.radiusY,
-            0,
-            0,
-            Math.PI * 2
-        );
-        ctx.fill();
-        ctx.restore();
+        const m = this.getVMatrix();
+        const rX = Math.abs(this.radiusX * this.scaleX);
+        const rY = Math.abs(this.radiusY * this.scaleY);
 
-        // Обводка
-        ctx.save();
+        ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+        ctx.scale(Math.sign(this.scaleX), Math.sign(this.scaleY));
+
+        const alpha = ctx.globalAlpha;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rX, rY, 0, 0, Math.PI * 2);
+        ctx.fillStyle = this.fill;
+        ctx.globalAlpha = this.fillOpacity;
+        ctx.fill();
+
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
-        if (typeof this.strokeOpacity === 'number') {
-            ctx.globalAlpha = this.strokeOpacity;
-        }
-        ctx.beginPath();
-        ctx.ellipse(
-            this.position.x,
-            this.position.y,
-            this.radiusX,
-            this.radiusY,
-            0,
-            0,
-            Math.PI * 2
-        );
+        ctx.globalAlpha = this.strokeOpacity;
         ctx.stroke();
+        ctx.globalAlpha = alpha;
         ctx.restore();
     }
 

@@ -4,11 +4,9 @@ import type { Component } from 'vue';
 import {
     Hand,
     MousePointer2,
-    Pencil,
     Minus,
     Square,
     Circle,
-    Spline,
     Eraser,
     Type,
     Triangle,
@@ -23,7 +21,6 @@ import { useCanvasStore } from '@/stores/canvas';
 type ToolId =
     | 'hand'
     | 'cursor'
-    | 'pencil'
     | 'line'
     | 'rect'
     | 'circle'
@@ -32,7 +29,6 @@ type ToolId =
     | 'star'
     | 'hexagon'
     | 'arrow'
-    | 'curve'
     | 'eraser'
     | 'text';
 
@@ -45,7 +41,6 @@ type Tool = {
 const tools: Tool[] = [
     { id: 'hand', title: 'Рука', icon: Hand },
     { id: 'cursor', title: 'Курсор', icon: MousePointer2 },
-    { id: 'pencil', title: 'Карандаш', icon: Pencil },
     { id: 'line', title: 'Линия', icon: Minus },
     { id: 'rect', title: 'Прямоугольник', icon: Square },
     { id: 'circle', title: 'Круг', icon: Circle },
@@ -54,7 +49,6 @@ const tools: Tool[] = [
     { id: 'star', title: 'Звезда', icon: Star },
     { id: 'hexagon', title: 'Шестиугольник', icon: Hexagon },
     { id: 'arrow', title: 'Стрелка', icon: ArrowUp },
-    { id: 'curve', title: 'Кривая линия', icon: Spline },
     { id: 'eraser', title: 'Ластик', icon: Eraser },
     { id: 'text', title: 'Текст', icon: Type },
 ];
@@ -104,10 +98,6 @@ function handleClick(tool: Tool) {
             canvasStore.addShape('arrow', { x: 400, y: 300 });
             toolsStore.setActiveTool('select');
             break;
-        case 'curve':
-            canvasStore.addShape('curve', { x: 400, y: 300 });
-            toolsStore.setActiveTool('select');
-            break;
         case 'eraser':
             toolsStore.setActiveTool('eraser');
             break;
@@ -137,7 +127,6 @@ const activeId = computed<ToolId>(() => {
     if (active === 'star') return 'star';
     if (active === 'hexagon') return 'hexagon';
     if (active === 'arrow') return 'arrow';
-    if (active === 'curve') return 'curve';
     if (active === 'eraser') return 'eraser';
     return 'cursor';
 });

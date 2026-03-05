@@ -11,7 +11,7 @@ export type ToolType =
     | 'star'
     | 'hexagon'
     | 'arrow'
-    | 'curve';
+    | 'eraser';
 
 /**
  * Хранилище состояния активного инструмента редактора.

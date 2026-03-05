@@ -1,67 +1,20 @@
 /**
  * Отрезок прямой с началом и концом.
  */
-import { Editable, HideProperties } from '../property';
+import { HideProperties } from '../property';
 import type { BoundingBox, Point } from '../base';
 import { BaseShape } from '../base';
 import { shapeRegistry } from '../registry';
 
-@HideProperties(['x', 'y'])
+@HideProperties(['x', 'y', 'rotation'])
 export class LineShape extends BaseShape {
     type = 'line';
 
-    @Editable({ label: 'Stroke Color', type: 'color' })
     stroke: string;
-
-    @Editable({
-        label: 'Stroke Opacity',
-        type: 'number',
-        min: 0,
-        max: 1,
-        step: 0.05,
-    })
     strokeOpacity: number = 1;
-
-    @Editable({
-        label: 'Stroke Width',
-        type: 'number',
-        min: 1,
-        max: 50,
-        step: 0.5,
-    })
     strokeWidth: number;
 
-    @Editable({ label: 'Start X', type: 'number' })
-    get startX(): number {
-        return this.position.x;
-    }
-    set startX(v: number) {
-        this.position.x = v;
-    }
-
-    @Editable({ label: 'Start Y', type: 'number' })
-    get startY(): number {
-        return this.position.y;
-    }
-    set startY(v: number) {
-        this.position.y = v;
-    }
-
-    @Editable({ label: 'End X', type: 'number' })
-    get endX(): number {
-        return this.endPoint.x;
-    }
-    set endX(v: number) {
-        this.endPoint.x = v;
-    }
-
-    @Editable({ label: 'End Y', type: 'number' })
-    get endY(): number {
-        return this.endPoint.y;
-    }
-    set endY(v: number) {
-        this.endPoint.y = v;
-    }
+    localEndPoint: Point;
 
     /**
      * @param id Идентификатор
@@ -78,95 +31,101 @@ export class LineShape extends BaseShape {
         strokeWidth: number = 2
     ) {
         super(id, position);
-        this.points = [{ ...endPoint }];
+        this.localEndPoint = {
+            x: endPoint.x - position.x,
+            y: endPoint.y - position.y,
+        };
         this.stroke = stroke;
         this.strokeWidth = strokeWidth;
     }
 
     get endPoint(): Point {
-        return this.points?.[0] ?? this.position;
+        return this.toGlobalPoint(this.localEndPoint);
     }
 
-    set endPoint(point: Point) {
-        if (this.points) {
-            this.points[0] = { ...point };
-        } else {
-            this.points = [{ ...point }];
-        }
+    set endPoint(globalPoint: Point) {
+        this.localEndPoint = this.toLocalPoint(globalPoint);
     }
 
-    hitTest(point: Point): boolean {
-        const dx = this.endPoint.x - this.position.x;
-        const dy = this.endPoint.y - this.position.y;
+    setSize(width: number, height: number): void {
+        const signX = Math.sign(this.localEndPoint.x) || 1;
+        const signY = Math.sign(this.localEndPoint.y) || 1;
+        this.localEndPoint.x = width * signX;
+        this.localEndPoint.y = height * signY;
+    }
+
+    hitTest(globalPoint: Point): boolean {
+        const localPoint = this.toVLocalPoint(globalPoint);
+        const dx = this.localEndPoint.x * this.scaleX;
+        const dy = this.localEndPoint.y * this.scaleY;
         const lenSquared = dx * dx + dy * dy;
 
-        if (lenSquared === 0) {
-            const dist = Math.sqrt(
-                Math.pow(point.x - this.position.x, 2) +
-                    Math.pow(point.y - this.position.y, 2)
-            );
-            return dist <= this.strokeWidth / 2 + 3;
+        let t = 0;
+        if (lenSquared > 0) {
+            t = (localPoint.x * dx + localPoint.y * dy) / lenSquared;
+            t = Math.max(0, Math.min(1, t));
         }
 
-        let t =
-            ((point.x - this.position.x) * dx +
-                (point.y - this.position.y) * dy) /
-            lenSquared;
-        t = Math.max(0, Math.min(1, t));
-
-        const projX = this.position.x + t * dx;
-        const projY = this.position.y + t * dy;
-
-        const distToLine = Math.sqrt(
-            Math.pow(point.x - projX, 2) + Math.pow(point.y - projY, 2)
+        const projX = t * dx;
+        const projY = t * dy;
+        return (
+            Math.hypot(localPoint.x - projX, localPoint.y - projY) <=
+            this.strokeWidth / 2 + 5
         );
+    }
 
-        return distToLine <= this.strokeWidth / 2 + 3;
+    getLocalBox(): BoundingBox {
+        const padding = this.strokeWidth / 2 + 5;
+        return {
+            minX: Math.min(0, this.localEndPoint.x) - padding,
+            minY: Math.min(0, this.localEndPoint.y) - padding,
+            maxX: Math.max(0, this.localEndPoint.x) + padding,
+            maxY: Math.max(0, this.localEndPoint.y) + padding,
+        };
     }
 
     getBoundingBox(): BoundingBox {
-        const minX = Math.min(this.position.x, this.endPoint.x);
-        const maxX = Math.max(this.position.x, this.endPoint.x);
-        const minY = Math.min(this.position.y, this.endPoint.y);
-        const maxY = Math.max(this.position.y, this.endPoint.y);
+        const localBox = this.getLocalBox();
+        const corners = [
+            this.toGlobalPoint({ x: localBox.minX, y: localBox.minY }),
+            this.toGlobalPoint({ x: localBox.maxX, y: localBox.minY }),
+            this.toGlobalPoint({ x: localBox.maxX, y: localBox.maxY }),
+            this.toGlobalPoint({ x: localBox.minX, y: localBox.maxY }),
+        ];
 
-        const padding = this.strokeWidth / 2 + 5;
         return {
-            minX: minX - padding,
-            minY: minY - padding,
-            maxX: maxX + padding,
-            maxY: maxY + padding,
+            minX: Math.min(...corners.map((p) => p.x)),
+            minY: Math.min(...corners.map((p) => p.y)),
+            maxX: Math.max(...corners.map((p) => p.x)),
+            maxY: Math.max(...corners.map((p) => p.y)),
         };
     }
 
     render(ctx: CanvasRenderingContext2D): void {
         ctx.save();
+        const m = this.getVMatrix();
+        ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
 
+        const alpha = ctx.globalAlpha;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
         ctx.lineCap = 'round';
-
-        if (typeof this.strokeOpacity === 'number') {
-            ctx.globalAlpha = this.strokeOpacity;
-        }
+        ctx.globalAlpha = this.strokeOpacity;
 
         ctx.beginPath();
-        ctx.moveTo(this.position.x, this.position.y);
-        ctx.lineTo(this.endPoint.x, this.endPoint.y);
+        ctx.moveTo(0, 0);
+        ctx.lineTo(
+            this.localEndPoint.x * this.scaleX,
+            this.localEndPoint.y * this.scaleY
+        );
         ctx.stroke();
-
+        ctx.globalAlpha = alpha;
         ctx.restore();
     }
 
     move(delta: Point): void {
         this.position.x += delta.x;
         this.position.y += delta.y;
-
-        if (this.points && this.points[0]) {
-            this.points[0].x += delta.x;
-            this.points[0].y += delta.y;
-        }
     }
 }
-
 shapeRegistry.register('line', LineShape);

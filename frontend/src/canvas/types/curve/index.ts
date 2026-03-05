@@ -1,1 +1,0 @@
-export { CurveShape } from './curve';
