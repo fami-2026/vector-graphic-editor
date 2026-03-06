@@ -38,7 +38,9 @@ export function useInteractions(
     const resizeStartLocalBox = ref<BoundingBox | null>(null);
     const resizeStartMatrix = ref<DOMMatrix | null>(null);
     const resizeStartInverse = ref<DOMMatrix | null>(null);
+    const resizeStartScale = ref<Point>({ x: 1, y: 1 });
     const lineStartLocal = ref<Point | null>(null);
+
 
     // Синхронизация выделенной фигуры из стора
     watch(
@@ -321,12 +323,13 @@ export function useInteractions(
             let nMinY = startBox.minY,
                 nMaxY = startBox.maxY;
 
+            let moveX = localMouse.x;
+            let moveY = localMouse.y;
+
             if (shift && ['lt', 'rt', 'lb', 'rb'].includes(handle)) {
-                // пропорциональное изменение
                 const origW = startBox.maxX - startBox.minX;
                 const origH = startBox.maxY - startBox.minY;
 
-                // координаты опорного (фиксированного) угла
                 const fixedX = handle.includes('l')
                     ? startBox.maxX
                     : startBox.minX;
@@ -334,51 +337,40 @@ export function useInteractions(
                     ? startBox.maxY
                     : startBox.minY;
 
-                // начальная позиция двигаемого угла (до смещения)
-                const startHandleX = handle.includes('l')
-                    ? startBox.minX
-                    : startBox.maxX;
-                const startHandleY = handle.includes('t')
-                    ? startBox.minY
-                    : startBox.maxY;
+                const deltaX = localMouse.x - fixedX;
+                const deltaY = localMouse.y - fixedY;
+                const kx = origW === 0 ? 1 : Math.abs(deltaX) / origW;
+                const ky = origH === 0 ? 1 : Math.abs(deltaY) / origH;
+                const ratio = Math.max(kx, ky, 0.01);
 
-                const dirX = handle.includes('l') ? -1 : 1;
-                const dirY = handle.includes('t') ? -1 : 1;
+                moveX = fixedX + Math.sign(deltaX || 1) * origW * ratio;
+                moveY = fixedY + Math.sign(deltaY || 1) * origH * ratio;
 
-                const deltaX = localMouse.x - startHandleX;
-                const deltaY = localMouse.y - startHandleY;
-                const effX = deltaX * dirX;
-                const effY = deltaY * dirY;
-
-                // коэффициент масштабирования, ==1 при отсутствии движения
-                const kx = origW ? 1 + effX / origW : 1;
-                const ky = origH ? 1 + effY / origH : 1;
-                let k = Math.max(Math.abs(kx), Math.abs(ky));
-                k = Math.max(k, 0.01); // не допускать нулевого размера
-
-                const newW = origW * k;
-                const newH = origH * k;
-
-                if (handle.includes('l')) {
-                    nMinX = fixedX - newW;
-                    nMaxX = fixedX;
-                } else {
-                    nMinX = fixedX;
-                    nMaxX = fixedX + newW;
-                }
-
-                if (handle.includes('t')) {
-                    nMinY = fixedY - newH;
-                    nMaxY = fixedY;
-                } else {
-                    nMinY = fixedY;
-                    nMaxY = fixedY + newH;
-                }
+                nMinX = Math.min(fixedX, moveX);
+                nMaxX = Math.max(fixedX, moveX);
+                nMinY = Math.min(fixedY, moveY);
+                nMaxY = Math.max(fixedY, moveY);
             } else {
-                if (handle.includes('l')) nMinX = localMouse.x;
-                if (handle.includes('r')) nMaxX = localMouse.x;
-                if (handle.includes('t')) nMinY = localMouse.y;
-                if (handle.includes('b')) nMaxY = localMouse.y;
+                if (handle.includes('l')) {
+                    moveX = localMouse.x;
+                    nMinX = Math.min(startBox.maxX, moveX);
+                    nMaxX = Math.max(startBox.maxX, moveX);
+                }
+                if (handle.includes('r')) {
+                    moveX = localMouse.x;
+                    nMinX = Math.min(startBox.minX, moveX);
+                    nMaxX = Math.max(startBox.minX, moveX);
+                }
+                if (handle.includes('t')) {
+                    moveY = localMouse.y;
+                    nMinY = Math.min(startBox.maxY, moveY);
+                    nMaxY = Math.max(startBox.maxY, moveY);
+                }
+                if (handle.includes('b')) {
+                    moveY = localMouse.y;
+                    nMinY = Math.min(startBox.minY, moveY);
+                    nMaxY = Math.max(startBox.minY, moveY);
+                }
             }
 
             const newWidth = Math.abs(nMaxX - nMinX);
@@ -398,6 +390,29 @@ export function useInteractions(
 
             activeShape.value.position.x = newGlobalCenter.x;
             activeShape.value.position.y = newGlobalCenter.y;
+
+            const startScaleX = resizeStartScale.value.x;
+            const startScaleY = resizeStartScale.value.y;
+
+            if (handle.includes('l') || handle.includes('r')) {
+                const fixedX = handle.includes('l')
+                    ? startBox.maxX
+                    : startBox.minX;
+                const expectedDir = handle.includes('l') ? -1 : 1;
+                const actualDir = Math.sign(moveX - fixedX) || expectedDir;
+                const sign = actualDir === expectedDir ? 1 : -1;
+                activeShape.value.scaleX = startScaleX * sign;
+            }
+
+            if (handle.includes('t') || handle.includes('b')) {
+                const fixedY = handle.includes('t')
+                    ? startBox.maxY
+                    : startBox.minY;
+                const expectedDir = handle.includes('t') ? -1 : 1;
+                const actualDir = Math.sign(moveY - fixedY) || expectedDir;
+                const sign = actualDir === expectedDir ? 1 : -1;
+                activeShape.value.scaleY = startScaleY * sign;
+            }
 
             canvas.style.cursor = getCursorStyle(handle, activeShape.value);
             return;
