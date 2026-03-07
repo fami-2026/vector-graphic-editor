@@ -4,11 +4,16 @@ import { storeToRefs } from 'pinia';
 import { useCanvasStore } from '@/stores/canvas';
 import { useCanvasRender } from '@/canvas/composables/useCanvasRender';
 import { useInteractions } from '@/canvas/composables/useInteractions';
+import CurveEditDialog from '@/gui/components/CurveEditDialog.vue';
+import type { EditableCurve } from '@/stores/canvas';
+import type { CurveShapeWrapper } from '@/canvas/types/curve/curve';
 
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-const { shapes, selectedId } = storeToRefs(useCanvasStore());
+const canvasStore = useCanvasStore();
+const { shapes, selectedId, curveDrawing, showCurveDialog, tempCurve } =
+    storeToRefs(canvasStore);
 
 const { draw } = useCanvasRender(canvasRef, shapes, selectedId);
 const { attachListeners } = useInteractions(canvasRef, shapes);
@@ -28,7 +33,86 @@ const updateCanvasSize = () => {
         canvasRef.value.width = clientWidth;
         canvasRef.value.height = clientHeight;
         draw();
+        drawTemporaryPoints();
     }
+};
+
+const drawTemporaryPoints = () => {
+    if (!canvasRef.value || !curveDrawing.value) return;
+
+    const ctx = canvasRef.value.getContext('2d');
+    if (!ctx) return;
+
+    const points = curveDrawing.value.points;
+
+    points.forEach((point, index) => {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+
+        if (index === 0) {
+            ctx.fillStyle = '#4CAF50';
+        } else {
+            ctx.fillStyle = '#F44336';
+        }
+
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    });
+
+    if (points.length === 1) {
+        ctx.font = '14px Arial';
+        ctx.fillStyle = '#666';
+        ctx.fillText('Кликните для конечной точки', 20, 30);
+    }
+};
+
+const customDraw = () => {
+    draw();
+    drawTemporaryPoints();
+};
+
+const handleCanvasClick = (e: MouseEvent) => {
+    if (!canvasRef.value) return;
+
+    const rect = canvasRef.value.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (canvasStore.curveDrawing) {
+        canvasStore.handleCanvasClick(x, y);
+        e.stopPropagation();
+        customDraw();
+    }
+};
+
+const handleCanvasDoubleClick = (e: MouseEvent) => {
+    if (!canvasRef.value) return;
+
+    const rect = canvasRef.value.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    for (const shape of canvasStore.shapes) {
+        if (shape.type === 'curve' && shape.hitTest({ x, y })) {
+            console.log('🔍 Double clicked on curve:', shape);
+            canvasStore.editCurve(shape as CurveShapeWrapper);
+            break;
+        }
+    }
+};
+
+const handleCurveUpdate = (updatedCurve: EditableCurve) => {
+    canvasStore.tempCurve = updatedCurve;
+};
+
+const handleCurveConfirm = () => {
+    if (canvasStore.tempCurve) {
+        canvasStore.updateCurve(canvasStore.tempCurve);
+    }
+    canvasStore.showCurveDialog = false;
+    canvasStore.tempCurve = null;
 };
 
 onMounted(() => {
@@ -38,19 +122,45 @@ onMounted(() => {
     }
 
     detachListeners = attachListeners();
+
+    if (canvasRef.value) {
+        canvasRef.value.addEventListener('click', handleCanvasClick);
+        canvasRef.value.addEventListener('dblclick', handleCanvasDoubleClick);
+    }
 });
 
 onUnmounted(() => {
     resizeObserver?.disconnect();
     detachListeners?.();
+
+    if (canvasRef.value) {
+        canvasRef.value.removeEventListener('click', handleCanvasClick);
+        canvasRef.value.removeEventListener(
+            'dblclick',
+            handleCanvasDoubleClick
+        );
+    }
 });
 
-watch([shapes, selectedId], () => requestAnimationFrame(draw), { deep: true });
+watch(
+    [shapes, selectedId, curveDrawing],
+    () => requestAnimationFrame(customDraw),
+    { deep: true }
+);
 </script>
 
 <template>
     <div ref="containerRef" class="canvas-wrapper">
         <canvas ref="canvasRef" class="main-canvas"></canvas>
+
+        <CurveEditDialog
+            v-if="showCurveDialog && tempCurve"
+            v-model:show="showCurveDialog"
+            :curve="tempCurve"
+            @update:curve="handleCurveUpdate"
+            @confirm="handleCurveConfirm"
+            @cancel="canvasStore.cancelCurveDrawing()"
+        />
     </div>
 </template>
 

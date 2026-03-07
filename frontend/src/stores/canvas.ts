@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Shape } from '@/canvas/types';
 import { shapeRegistry } from '@/canvas/types';
 import { generateId } from '@/canvas/utils/math';
 import { PolygonShape } from '@/canvas/types/polygon/polygon';
+import type { Shape, Point } from '@/canvas/types';
+import { CurveShapeWrapper } from '@/canvas/types/curve/curve';
 
 interface ShapeParams extends Record<string, unknown> {
     sides?: number;
@@ -16,6 +17,32 @@ interface ShapeParams extends Record<string, unknown> {
     strokeOpacity?: number;
     strokeWidth?: number;
     rotation?: number;
+}
+
+interface CurveDrawingState {
+    points: Point[];
+}
+
+export interface EditableCurve {
+    id?: string;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    cp1X: number;
+    cp1Y: number;
+    cp2X: number;
+    cp2Y: number;
+    stroke: string;
+    strokeOpacity: number;
+    strokeWidth: number;
+    bendCount: number;
+    originalStartX?: number;
+    originalStartY?: number;
+    originalEndX?: number;
+    originalEndY?: number;
+    offsetX?: number;
+    offsetY?: number;
 }
 
 type SerializedShapeBase = {
@@ -37,6 +64,10 @@ type SceneSnapshot = {
 export const useCanvasStore = defineStore('canvas', () => {
     const shapes = ref<Shape[]>([]);
     const selectedId = ref<string | null>(null);
+
+    const curveDrawing = ref<CurveDrawingState | null>(null);
+    const tempCurve = ref<EditableCurve | null>(null);
+    const showCurveDialog = ref(false);
 
     const undoStack = ref<SceneSnapshot[]>([]);
     const redoStack = ref<SceneSnapshot[]>([]);
@@ -209,6 +240,123 @@ export const useCanvasStore = defineStore('canvas', () => {
         selectedId.value = id;
     }
 
+    function startCurveDrawing() {
+        curveDrawing.value = {
+            points: [],
+        };
+    }
+
+    function handleCanvasClick(x: number, y: number) {
+        if (!curveDrawing.value) {
+            return;
+        }
+
+        curveDrawing.value.points.push({ x, y });
+
+        if (curveDrawing.value.points.length === 2) {
+            createStraightCurve();
+        }
+    }
+
+    function createStraightCurve() {
+        if (!curveDrawing.value) return;
+        if (curveDrawing.value.points.length === 2) {
+            const points = curveDrawing.value.points;
+            const start = points[0];
+            const end = points[1];
+
+            if (start && end) {
+                const curve = new CurveShapeWrapper(generateId(), start);
+
+                curve.endX = end.x;
+                curve.endY = end.y;
+
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+                curve.cp1X = start.x + dx / 3;
+                curve.cp1Y = start.y + dy / 3;
+                curve.cp2X = start.x + (2 * dx) / 3;
+                curve.cp2Y = start.y + (2 * dy) / 3;
+
+                shapes.value.push(curve);
+                curveDrawing.value = null;
+            }
+        }
+    }
+
+    function updateCurve(updatedCurve: EditableCurve) {
+        if (!updatedCurve.id) return;
+
+        const index = shapes.value.findIndex((s) => s.id === updatedCurve.id);
+        if (index !== -1) {
+            const shape = shapes.value[index] as unknown as CurveShapeWrapper;
+
+            shape.startX = updatedCurve.startX;
+            shape.startY = updatedCurve.startY;
+            shape.endX = updatedCurve.endX;
+            shape.endY = updatedCurve.endY;
+            shape.cp1X = updatedCurve.cp1X;
+            shape.cp1Y = updatedCurve.cp1Y;
+            shape.cp2X = updatedCurve.cp2X;
+            shape.cp2Y = updatedCurve.cp2Y;
+            shape.bendCount = updatedCurve.bendCount;
+
+            shapes.value = [...shapes.value];
+        }
+    }
+
+    function editCurve(shape: CurveShapeWrapper) {
+        const editableCurve: EditableCurve = {
+            id: shape.id,
+            startX: shape.startX,
+            startY: shape.startY,
+            endX: shape.endX,
+            endY: shape.endY,
+            cp1X: shape.cp1X,
+            cp1Y: shape.cp1Y,
+            cp2X: shape.cp2X,
+            cp2Y: shape.cp2Y,
+            stroke: shape.stroke,
+            strokeOpacity: shape.strokeOpacity || 1,
+            strokeWidth: shape.strokeWidth,
+            bendCount: shape.bendCount || 0,
+            originalStartX: shape.startX,
+            originalStartY: shape.startY,
+            originalEndX: shape.endX,
+            originalEndY: shape.endY,
+            offsetX: 0,
+            offsetY: 0,
+        };
+
+        tempCurve.value = editableCurve;
+        showCurveDialog.value = true;
+    }
+
+    function cancelCurveDrawing() {
+        curveDrawing.value = null;
+        tempCurve.value = null;
+        showCurveDialog.value = false;
+    }
+
+    function confirmCurve() {
+        if (tempCurve.value) {
+            const c = tempCurve.value;
+            const curve = new CurveShapeWrapper(generateId(), {
+                x: c.originalStartX!,
+                y: c.originalStartY!,
+            });
+
+            curve.cp1X = c.cp1X;
+            curve.cp1Y = c.cp1Y;
+            curve.cp2X = c.cp2X;
+            curve.cp2Y = c.cp2Y;
+
+            shapes.value.push(curve);
+            tempCurve.value = null;
+        }
+        showCurveDialog.value = false;
+    }
+
     return {
         shapes,
         selectedId,
@@ -224,5 +372,14 @@ export const useCanvasStore = defineStore('canvas', () => {
         canRedo,
         startInteraction,
         endInteraction,
+        curveDrawing,
+        tempCurve,
+        showCurveDialog,
+        startCurveDrawing,
+        handleCanvasClick,
+        cancelCurveDrawing,
+        confirmCurve,
+        editCurve,
+        updateCurve,
     };
 });

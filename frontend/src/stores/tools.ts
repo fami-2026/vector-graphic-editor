@@ -10,6 +10,7 @@ export type ToolType =
     | 'polygon'
     | 'star'
     | 'hexagon'
+    | 'curve'
     | 'arrow'
     | 'eraser';
 

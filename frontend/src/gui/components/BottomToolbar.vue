@@ -14,6 +14,7 @@ import {
     Hexagon,
     ArrowUp,
     Pentagon,
+    Spline,
 } from 'lucide-vue-next';
 import { useToolsStore, type ToolType } from '@/stores/tools';
 import { useCanvasStore } from '@/stores/canvas';
@@ -29,6 +30,7 @@ type ToolId =
     | 'star'
     | 'hexagon'
     | 'arrow'
+    | 'curve'
     | 'eraser'
     | 'text';
 
@@ -49,6 +51,7 @@ const tools: Tool[] = [
     { id: 'star', title: 'Звезда', icon: Star },
     { id: 'hexagon', title: 'Шестиугольник', icon: Hexagon },
     { id: 'arrow', title: 'Стрелка', icon: ArrowUp },
+    { id: 'curve', title: 'Кривая', icon: Spline },
     { id: 'eraser', title: 'Ластик', icon: Eraser },
     { id: 'text', title: 'Текст', icon: Type },
 ];
@@ -56,7 +59,6 @@ const tools: Tool[] = [
 const toolsStore = useToolsStore();
 const canvasStore = useCanvasStore();
 
-// Состояние для диалога многоугольника
 const showPolygonDialog = ref(false);
 const polygonSides = ref(5);
 
@@ -83,7 +85,6 @@ function handleClick(tool: Tool) {
             toolsStore.setActiveTool('select');
             break;
         case 'polygon':
-            // Показываем диалог для выбора количества углов
             showPolygonDialog.value = true;
             break;
         case 'star':
@@ -97,6 +98,10 @@ function handleClick(tool: Tool) {
         case 'arrow':
             canvasStore.addShape('arrow', { x: 400, y: 300 });
             toolsStore.setActiveTool('select');
+            break;
+        case 'curve':
+            toolsStore.setActiveTool('curve');
+            canvasStore.startCurveDrawing();
             break;
         case 'eraser':
             toolsStore.setActiveTool('eraser');
@@ -127,6 +132,7 @@ const activeId = computed<ToolId>(() => {
     if (active === 'star') return 'star';
     if (active === 'hexagon') return 'hexagon';
     if (active === 'arrow') return 'arrow';
+    if (active === 'curve') return 'curve';
     if (active === 'eraser') return 'eraser';
     return 'cursor';
 });

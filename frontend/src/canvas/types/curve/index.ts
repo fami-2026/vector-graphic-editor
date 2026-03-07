@@ -1,0 +1,1 @@
+export { CurveShapeWrapper } from './curve';

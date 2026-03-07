@@ -8,6 +8,7 @@ export { TriangleShape } from './triangle';
 export { StarShape } from './star';
 export { ArrowShape } from './arrow';
 export { HexagonShape } from './hexagon';
+export { CurveShapeWrapper } from './curve';
 export { shapeRegistry } from './registry';
 export { SELECTION_PADDING } from './base';
 
