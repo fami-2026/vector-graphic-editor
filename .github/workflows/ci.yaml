@@ -4,7 +4,23 @@ on:
     branches:
       - main
 jobs:
+  try-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Taskfile
+        uses: go-task/setup-task@v1
+
+      - name: Try Build
+        run: task image
+
   format-and-lint:
+    needs: try-build
     permissions:
       contents: write
       pull-requests: write

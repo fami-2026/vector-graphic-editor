@@ -25,7 +25,8 @@
 	},
 
 	"runArgs": [
-		"--env-file=.devcontainer/secret.dev.env"
+		"--env-file=.devcontainer/secret.dev.env",
+		"--network=host"
 	],
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
@@ -38,7 +39,8 @@
 				"ms-azuretools.vscode-containers",
 				"-vscjava.vscode-java-pack",
 				"esbenp.prettier-vscode",
-				"task.vscode-task"
+				"task.vscode-task",
+				"vue.volar"
 			]
 		}
 	}

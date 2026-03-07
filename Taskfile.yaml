@@ -21,6 +21,8 @@ tasks:
       - task: server:publish
       - task: client:publish
   deploy:
+    env:
+      ORIGIN: '{{.ORIGIN | default "localhost:5000"}}'
     cmds:
       - docker network create vge || true
       - docker compose up -d

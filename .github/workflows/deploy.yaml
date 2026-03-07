@@ -25,6 +25,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Build Images
+        env:
+          SERVER_ADDR: ${{ vars.SERVER_ADDR }}
         run: task image
 
       - name: Publish Images
@@ -43,8 +45,9 @@ jobs:
         uses: go-task/setup-task@v1
 
       - name: Deploy
-        run: task server:deploy
+        run: task deploy
         env:
+          ORIGIN: ${{ vars.ORIGIN }}
           MONGO_USER: ${{ secrets.MONGO_USER }}
           MONGO_PASS: ${{ secrets.MONGO_PASS }}
 
@@ -60,8 +63,9 @@ jobs:
         run: task client:ci
       
       - name: Build Static
-        run: task client:build
+        run: task client:ci:build
         env:
+          SERVER_ADDR: ${{ vars.SERVER_ADDR }}
           BASE: /vector-graphic-editor/
 
       - name: Upload

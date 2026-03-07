@@ -156,3 +156,60 @@ VSC Extension: https://marketplace.visualstudio.com/items?itemName=ms-vscode-rem
 Собрать контейнер и открыть проект: `F1 -> Dev Containers: Rebuild and Reopen in Container`
 
 Любой используемый инструмент должен быть добавлен в описание контейнера.
+
+### Локальное окружение
+
+Собрать образы клиента и сервера:
+
+```bash
+task image
+```
+
+Запустить проект локально:
+
+```bash
+task deploy # после `image`
+```
+
+---
+
+Для отладки клиента можно запустить только серверную часть:
+
+```bash
+task server:image  # один раз
+task server:deploy
+```
+
+После этого, клиента можно запуcкать напрямую (избегая пересборки образа) с помощью:
+
+```bash
+task client:dev:run
+```
+
+Важно использовать именно команду `task`, а не `npm`, чтобы установить нужные переменные окружения.
+После запуска клиент будет доступен по адресу `http://localhost:5000`.
+
+## 10. Клиент-серверное взаимодействие
+
+Взаимодействие между клиентом и сервером осуществляется посредством
+[REST API](server/docs/openapi.yml).
+
+Адрес сервера _зашивается_ в клиента во время сборки и доступен через meta-переменную
+`VITE_SERVER_ADDR`. Пример запроса на сервер:
+
+```js
+const server = import.meta.env.VITE_SERVER_ADDR;
+
+console.log('Server Address: ', server);
+
+fetch(`http://${server}/api/canvas`, {
+    mode: 'cors',
+})
+    .then((response) => response.json())
+    .then((response) => {
+        console.log('Canvases: ', response);
+    });
+```
+
+Для более сложных запросов могут потребоваться дополнительные заголовки,
+см. [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS).

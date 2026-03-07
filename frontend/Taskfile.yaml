@@ -1,9 +1,17 @@
 version: "3"
 
 tasks:
+  format:
+    cmds:
+      - npm run format
+  lint:
+    cmds:
+      - npm run lint
+
+  # docker environment
   image:
     cmds:
-      - docker build -t {{.REGISTRY}}/vge.client:latest .
+      - docker build --build-arg VITE_SERVER_ADDR={{.SERVER_ADDR | default "localhost:8080"}} -t {{.REGISTRY}}/vge.client:latest .
   publish:
     cmds:
       - docker push {{.REGISTRY}}/vge.client:latest
@@ -11,15 +19,20 @@ tasks:
     cmds:
       - docker network create vge || true
       - docker compose up -d
+
+  # ci environment
   ci:
     cmds:
       - npm ci
-  build:
+  ci:build:
+    env:
+      VITE_SERVER_ADDR: '{{.SERVER_ADDR | default "localhost:8080"}}'
     cmds:
       - node_modules/.bin/vite build --base={{.BASE | default "/"}}
-  format:
+
+  # development environment
+  dev:run:
+    env:
+      VITE_SERVER_ADDR: localhost:8080
     cmds:
-      - npm run format
-  lint:
-    cmds:
-      - npm run lint
+      - npm run dev -- --port=5000

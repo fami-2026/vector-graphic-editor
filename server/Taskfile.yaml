@@ -1,6 +1,11 @@
 version: "3"
 
 tasks:
+  format:
+    cmds:
+      - gradle --no-daemon spotlessApply
+
+  # docker environment
   image:
     cmds:
       - docker build -t {{.REGISTRY}}/vge.server:latest .
@@ -8,9 +13,8 @@ tasks:
     cmds:
       - docker push {{.REGISTRY}}/vge.server:latest
   deploy:
+    env:
+      ORIGIN: '{{.ORIGIN | default "localhost:5000"}}'
     cmds:
       - docker network create vge || true
       - docker compose up -d
-  format:
-    cmds:
-      - gradle --no-daemon spotlessApply
