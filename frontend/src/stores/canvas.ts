@@ -263,7 +263,6 @@ function createStraightCurve() {
         const start = points[0];
         const end = points[1];
         
-        console.log('📌 start:', start, 'end:', end);
         
         if (start && end) {
             const curve = new CurveShapeWrapper(
@@ -285,7 +284,6 @@ function createStraightCurve() {
             
             curveDrawing.value = null;
             
-            console.log('✅ Curve created and added to canvas');
         }
     }
 }
