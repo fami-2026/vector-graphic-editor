@@ -12,14 +12,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/canvas")
 @CrossOrigin(
         origins = "${cors.allowed-origins}",
-        methods = {
-                RequestMethod.GET,
-                RequestMethod.POST,
-                RequestMethod.PUT,
-                RequestMethod.DELETE,
-                RequestMethod.OPTIONS
-        }
-)
+        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS
+        })
 @RequiredArgsConstructor
 public class CanvasController {
 
