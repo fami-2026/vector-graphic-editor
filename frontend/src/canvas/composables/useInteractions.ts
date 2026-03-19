@@ -148,7 +148,6 @@ export function useInteractions(
         } else {
             pan.value.y -= e.deltaY;
         }
-
     }
 
     /**
