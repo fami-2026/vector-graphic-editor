@@ -73,6 +73,7 @@ export async function exportScene(options: ExportOptions): Promise<void> {
         throw new Error('Нет фигур для экспорта.');
     }
 
+    const totalBounds = getTotalBounds(options.shapes);
     const fileName = ensureExtension(options.fileName, options.format);
 
     if (options.format === 'svg') {
@@ -80,7 +81,6 @@ export async function exportScene(options: ExportOptions): Promise<void> {
     } else {
         await exportPng(target, fileName, options);
     }
-
 }
 
 function resolveExportTarget(options: ExportOptions): ExportTarget | null {
@@ -121,9 +121,7 @@ async function exportPng(
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-        throw new Error(
-            'Не удалось получить контекст canvas для PNG-экспорта.'
-        );
+        throw new Error('Не удалось получить контекст canvas для PNG-экспорта.');
     }
 
     ctx.scale(scale, scale);
@@ -320,10 +318,7 @@ function ensureExtension(fileName: string, format: ExportFormat): string {
     return `${safeBase}.${format}`;
 }
 
-function canvasToBlob(
-    canvas: HTMLCanvasElement,
-    mimeType: string
-): Promise<Blob> {
+function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string): Promise<Blob> {
     return new Promise((resolve, reject) => {
         canvas.toBlob((blob) => {
             if (!blob) {
