@@ -21,7 +21,12 @@
         </button>
 
         <div v-if="open" class="menu" role="menu">
-            <button class="item" role="menuitem" type="button" @click="openExport('png')">
+            <button
+                class="item"
+                role="menuitem"
+                type="button"
+                @click="openExport('png')"
+            >
                 PNG
             </button>
             <button
@@ -183,7 +188,6 @@ function resolveExportBackground(): ExportBackground {
 
     return form.pngBackground;
 }
-
 function exportJson() {
     const json = canvasStore.exportToJson();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -199,6 +203,7 @@ function exportJson() {
 
     close();
 }
+
 async function submitExport() {
     normalizeFileName();
 
