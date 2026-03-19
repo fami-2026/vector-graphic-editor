@@ -13,7 +13,6 @@
             <div class="zoomValue" v-if="!isEditing" @dblclick="startEditing">
                 {{ zoom }}%
             </div>
-
             <input
                 v-else
                 ref="inputRef"
@@ -27,7 +26,6 @@
                 inputmode="numeric"
                 pattern="[0-9]*"
             />
-
             <button
                 class="iconBtn"
                 type="button"
@@ -97,7 +95,6 @@ function onRedo() {
 function startEditing() {
     inputValue.value = String(zoom.value);
     isEditing.value = true;
-
     nextTick(() => {
         inputRef.value?.focus();
         inputRef.value?.select();
@@ -128,16 +125,13 @@ function validateInput(e: KeyboardEvent) {
 
 function saveZoom() {
     if (!isEditing.value) return;
-
     const value = parseInt(inputValue.value, 10);
-
     // Проверка: только положительные числа
     if (!isNaN(value) && value > 0) {
         // Ограничиваем макс 500%
         const clampedValue = Math.min(value, 500);
         canvasStore.setZoom(clampedValue);
     }
-
     cancelEditing();
 }
 
@@ -189,7 +183,7 @@ function cancelEditing() {
     font-size: 12px;
     font-weight: 600;
     color: #374151;
-    border: 1px solid #2196f3;
+    border: 1px solid #2196F3;
     border-radius: 4px;
     padding: 2px 4px;
     outline: none;

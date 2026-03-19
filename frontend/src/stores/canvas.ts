@@ -281,7 +281,20 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function setZoom(value: number) {
-        zoom.value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value)));
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value)));
+        if (newZoom === zoom.value) return;
+        
+        // Сохраняем мировую точку, которая сейчас в центре экрана
+        const worldCenterX = -pan.value.x / (zoom.value / 100);
+        const worldCenterY = -pan.value.y / (zoom.value / 100);
+        
+        // Новый pan для того же центра
+        const newZoomFactor = newZoom / 100;
+        const newPanX = -worldCenterX * newZoomFactor;
+        const newPanY = -worldCenterY * newZoomFactor;
+        
+        zoom.value = newZoom;
+        pan.value = { x: newPanX, y: newPanY };
     }
 
     function zoomIn() {
