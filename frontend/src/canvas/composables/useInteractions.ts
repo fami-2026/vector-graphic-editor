@@ -133,7 +133,6 @@ export function useInteractions(
 
         e.preventDefault();
 
-<<<<<<< HEAD
         if (e.shiftKey) {
             pan.value.x -= e.deltaY;
         } else {
