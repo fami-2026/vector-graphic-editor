@@ -564,6 +564,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const newPanX = -worldCenterX * newZoomFactor;
         const newPanY = -worldCenterY * newZoomFactor;
 
+
         zoom.value = newZoom;
         pan.value = { x: newPanX, y: newPanY };
     }
