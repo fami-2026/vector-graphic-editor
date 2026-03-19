@@ -109,7 +109,9 @@ async function exportPng(
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-        throw new Error('Не удалось получить контекст canvas для PNG-экспорта.');
+        throw new Error(
+            'Не удалось получить контекст canvas для PNG-экспорта.'
+        );
     }
 
     ctx.scale(scale, scale);
@@ -299,7 +301,10 @@ function ensureExtension(fileName: string, format: ExportFormat): string {
     return `${safeBase}.${format}`;
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string): Promise<Blob> {
+function canvasToBlob(
+    canvas: HTMLCanvasElement,
+    mimeType: string
+): Promise<Blob> {
     return new Promise((resolve, reject) => {
         canvas.toBlob((blob) => {
             if (!blob) {
