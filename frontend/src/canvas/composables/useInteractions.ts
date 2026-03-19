@@ -181,7 +181,6 @@ export function useInteractions(
         const worldX = getLocalPoint(e).x;
         const worldY = getLocalPoint(e).y;
 
-
         const delta = e.deltaY > 0 ? -canvasStore.ZOOM_STEP : canvasStore.ZOOM_STEP;
         const newZoom = Math.max(
             canvasStore.MIN_ZOOM, 
