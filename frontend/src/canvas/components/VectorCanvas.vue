@@ -101,13 +101,6 @@ watch(
     <div ref="containerRef" class="canvas-wrapper">
         <canvas ref="canvasRef" class="main-canvas"></canvas>
         <div v-if="canvasStore.hasSelection" class="selection-info">
-            <span>Выбрано: {{ canvasStore.selectionCount }}</span>
-            <button
-                @click="canvasStore.deleteSelectedShapes"
-                class="delete-btn"
-            >
-                Удалить
-            </button>
         </div>
     </div>
 </template>
