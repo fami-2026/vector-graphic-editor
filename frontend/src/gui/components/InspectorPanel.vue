@@ -656,7 +656,7 @@ function thumbFill(shape: Shape): string {
     const fill = (shape as unknown as Record<string, unknown>).fill as
         | string
         | undefined;
-    if (!fill || fill === 'transparent') return '#e5e7eb';
+    if (!fill || fill === 'transparent') return 'transparent';
     return fill;
 }
 
@@ -664,10 +664,11 @@ function thumbFillOpacity(shape: Shape): number {
     const fill = (shape as unknown as Record<string, unknown>).fill as
         | string
         | undefined;
-    if (!fill || fill === 'transparent') return 0.4;
+    if (!fill || fill === 'transparent') return 0;
+
     const opacity = (shape as unknown as Record<string, unknown>)
         .fillOpacity as number | undefined;
-    return typeof opacity === 'number' ? Math.max(0.15, opacity) : 1;
+    return typeof opacity === 'number' ? Math.max(0, Math.min(1,opacity)) : 1;
 }
 
 function thumbStroke(shape: Shape): string {
