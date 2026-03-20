@@ -594,21 +594,21 @@ if (data.zoom) zoom.value = data.zoom;
         //     return;
         // }
 
-        try {
-            if (documentId.value !== '0') {
-                const remote = await getCanvasById(documentId.value);
-                if (localScene.shapes.length === 0) {
-                    const apiSnapshot: ApiSceneSnapshot = {
-                        shapes: (remote.content.shapes as SerializedShape[] | undefined) ?? [],
-                        selectedId: (remote.content.selectedId as string | null | undefined) ?? null,
-                    };
-                    restoreInternalSnapshot(apiToInternalSnapshot(apiSnapshot));
-                } else {
-                    await updateCanvas(
-                        documentId.value,
-                        snapshotToServerContent(localScene)
-                    );
-                }
+    try {
+        if (documentId.value !== '0') {
+            const remote = await getCanvasById(documentId.value);
+            if (localScene.shapes.length === 0) {
+                const apiSnapshot: ApiSceneSnapshot = {
+                    shapes: (remote.content.shapes as SerializedShape[] | undefined) ?? [],
+                    selectedId: (remote.content.selectedId as string | null | undefined) ?? null,
+                };
+                restoreInternalSnapshot(apiToInternalSnapshot(apiSnapshot));
+            } else {
+                await updateCanvas(
+                    documentId.value,
+                    snapshotToServerContent(localScene)
+                );
+            }
 
                 isOfflineMode.value = false;
                 serverError.value = null;
@@ -616,20 +616,20 @@ if (data.zoom) zoom.value = data.zoom;
                 return;
             }
 
-            const created = await createCanvas(
-                snapshotToServerContent(localScene)
-            );
+        const created = await createCanvas(
+            snapshotToServerContent(localScene)
+        );
 
-            isOfflineMode.value = false;
-            documentId.value = created.id;
-            serverError.value = null;
-        } catch (error) {
-            isOfflineMode.value = true;
-            documentId.value = '0';
-            serverError.value =
-                error instanceof Error ? error.message : 'Сервер недоступен';
-        }
+        isOfflineMode.value = false;
+        documentId.value = created.id;
+        serverError.value = null;
+    } catch (error) {
+        isOfflineMode.value = true;
+        documentId.value = '0';
+        serverError.value =
+            error instanceof Error ? error.message : 'Сервер недоступен';
     }
+}
 
     async function openDocumentById(id: string): Promise<{
         success: boolean;
@@ -762,8 +762,8 @@ if (data.zoom) zoom.value = data.zoom;
 
     return {
         shapes,
-        selectedId, // для совместимости со старыми компонентами
-        selectedIds, // для новой функциональности
+        selectedId, 
+        selectedIds, 
         selectedShapes,
         hasSelection,
         selectionCount,
