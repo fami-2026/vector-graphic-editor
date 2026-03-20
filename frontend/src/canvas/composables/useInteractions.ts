@@ -121,8 +121,10 @@ export function useInteractions(
             );
             const newZoomFactor = newZoom / 100;
 
-            const newPanX = screenX - centerX - (worldX - centerX) * newZoomFactor;
-            const newPanY = screenY - centerY - (worldY - centerY) * newZoomFactor;
+            const newPanX =
+                screenX - centerX - (worldX - centerX) * newZoomFactor;
+            const newPanY =
+                screenY - centerY - (worldY - centerY) * newZoomFactor;
 
             zoom.value = newZoom;
             pan.value = { x: newPanX, y: newPanY };
