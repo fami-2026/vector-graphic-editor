@@ -17,9 +17,15 @@ type ResizeHandle =
     | 'e'
     | 'rot';
 
-/**
- * Composable для управления взаимодействиями пользователя (мышь, drag&drop).
- */
+interface ShapeResizeState {
+    shape: Shape;
+    startLocalBox: BoundingBox;
+    startMatrix: DOMMatrix;
+    startInverse: DOMMatrix;
+    startScale: Point;
+    startPosition: Point;
+    startLocalEndPoint?: Point;
+}
 
 export function useInteractions(
     canvasRef: Ref<HTMLCanvasElement | null>,
@@ -29,13 +35,17 @@ export function useInteractions(
 ) {
     const canvasStore = useCanvasStore();
     const toolsStore = useToolsStore();
+    const currentTransform = ref<DOMMatrix>(new DOMMatrix());
 
     const isDragging = ref(false);
     const isResizing = ref(false);
     const isCreating = ref(false);
     const isPanning = ref(false);
+    const isDraggingMultiple = ref(false);
+    const isResizingMultiple = ref(false);
 
     const dragStart = ref<Point>({ x: 0, y: 0 });
+    const dragStartPosition = ref<Point>({ x: 0, y: 0 });
     const panStart = ref<Point>({ x: 0, y: 0 });
     const activeShape = ref<Shape | null>(null);
     const resizeHandle = ref<ResizeHandle | null>(null);
@@ -44,13 +54,25 @@ export function useInteractions(
     const resizeStartMatrix = ref<DOMMatrix | null>(null);
     const resizeStartInverse = ref<DOMMatrix | null>(null);
     const resizeStartScale = ref<Point>({ x: 1, y: 1 });
+    const resizeStartPosition = ref<Point>({ x: 0, y: 0 });
     const lineStartLocal = ref<Point | null>(null);
+
+    const multiResizeStates = ref<Map<string, ShapeResizeState>>(new Map());
+    const selectionStartBox = ref<BoundingBox | null>(null);
+    const dragStartPositions = ref<Map<string, Point>>(new Map());
+
     const hasRecordedInteraction = ref(false);
+    const hasMoved = ref(false);
     const createStart = ref<Point | null>(null);
     const createToolType = ref<ToolType | null>(null);
     const createParams = ref<Record<string, unknown> | null>(null);
 
-    // Синхронизация выделенной фигуры из стора
+    const DRAG_THRESHOLD = 3;
+
+    function updateTransform(transform: DOMMatrix) {
+        currentTransform.value = transform;
+    }
+
     watch(
         [() => canvasStore.selectedId, shapes],
         () => {
@@ -61,25 +83,28 @@ export function useInteractions(
                 ) ?? null;
             activeShape.value = selected;
 
-            if (!selected) {
+            if (!selected && canvasStore.selectedIds.length === 0) {
                 isDragging.value = false;
                 isResizing.value = false;
+                isDraggingMultiple.value = false;
+                isResizingMultiple.value = false;
                 resizeHandle.value = null;
                 resizeStartLocalBox.value = null;
                 resizeStartMatrix.value = null;
                 resizeStartInverse.value = null;
                 lineStartLocal.value = null;
+                multiResizeStates.value.clear();
+                selectionStartBox.value = null;
+                dragStartPositions.value.clear();
                 createStart.value = null;
                 createToolType.value = null;
                 createParams.value = null;
+                hasMoved.value = false;
             }
         },
         { immediate: true }
     );
 
-    /**
-     * Конвертирует экранные координаты события мыши в локальные координаты холста.
-     */
     function getLocalPoint(e: MouseEvent): Point {
         const rect = canvasRef.value?.getBoundingClientRect();
         if (!rect) return { x: 0, y: 0 };
@@ -90,10 +115,10 @@ export function useInteractions(
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
 
-        return {
-            x: centerX + (screenX - centerX - pan.value.x) / zoomFactor,
-            y: centerY + (screenY - centerY - pan.value.y) / zoomFactor,
-        };
+        const worldX = centerX + (screenX - centerX - pan.value.x) / zoomFactor;
+        const worldY = centerY + (screenY - centerY - pan.value.y) / zoomFactor;
+
+        return { x: worldX, y: worldY };
     }
 
     function onWheel(e: WheelEvent) {
@@ -140,9 +165,6 @@ export function useInteractions(
         }
     }
 
-    /**
-     * Находит фигуру под курсором (слои проверяются с последней на первую).
-     */
     function hitTest(point: Point): Shape | null {
         for (let i = shapes.value.length - 1; i >= 0; i--) {
             const shape = shapes.value[i];
@@ -151,10 +173,6 @@ export function useInteractions(
         return null;
     }
 
-    /**
-     * Определяет, находится ли курсор над управляющей ручкой выделенной фигуры.
-     * Учитывает масштаб фигуры и паддинг выделения.
-     */
     function detectResizeHandle(
         shape: Shape,
         globalPoint: Point
@@ -224,9 +242,6 @@ export function useInteractions(
         return null;
     }
 
-    /**
-     * Вычисляет подходящий CSS-курсор с учетом поворота и отражения фигуры.
-     */
     function getCursorStyle(handle: string, shape: Shape): string {
         if (handle === 's' || handle === 'e') return 'crosshair';
         if (handle === 'rot') return 'grabbing';
@@ -265,6 +280,57 @@ export function useInteractions(
         return cursors[index] ?? 'default';
     }
 
+    function getVisualSelectionBox(): BoundingBox | null {
+        if (!canvasStore.selectionRect || canvasStore.selectedIds.length === 0) return null;
+
+        return {
+            minX: Math.min(canvasStore.selectionRect.start.x, canvasStore.selectionRect.end.x),
+            minY: Math.min(canvasStore.selectionRect.start.y, canvasStore.selectionRect.end.y),
+            maxX: Math.max(canvasStore.selectionRect.start.x, canvasStore.selectionRect.end.x),
+            maxY: Math.max(canvasStore.selectionRect.start.y, canvasStore.selectionRect.end.y)
+        };
+    }
+
+    function hitTestSelectionBox(point: Point): { handle: ResizeHandle | null, isInside: boolean } {
+        const selectionBox = getVisualSelectionBox();
+        if (!selectionBox) return { handle: null, isInside: false };
+
+        const padding = SELECTION_PADDING;
+        const edgeThreshold = 8;
+
+        const expandedBox = {
+            minX: selectionBox.minX - padding,
+            maxX: selectionBox.maxX + padding,
+            minY: selectionBox.minY - padding,
+            maxY: selectionBox.maxY + padding
+        };
+
+        const isInside = point.x >= expandedBox.minX &&
+            point.x <= expandedBox.maxX &&
+            point.y >= expandedBox.minY &&
+            point.y <= expandedBox.maxY;
+
+        const nearLeft = Math.abs(point.x - selectionBox.minX) <= edgeThreshold;
+        const nearRight = Math.abs(point.x - selectionBox.maxX) <= edgeThreshold;
+        const nearTop = Math.abs(point.y - selectionBox.minY) <= edgeThreshold;
+        const nearBottom = Math.abs(point.y - selectionBox.maxY) <= edgeThreshold;
+
+        const inY = point.y >= expandedBox.minY && point.y <= expandedBox.maxY;
+        const inX = point.x >= expandedBox.minX && point.x <= expandedBox.maxX;
+
+        if (nearLeft && nearTop && isInside) return { handle: 'lt', isInside: false };
+        if (nearRight && nearTop && isInside) return { handle: 'rt', isInside: false };
+        if (nearLeft && nearBottom && isInside) return { handle: 'lb', isInside: false };
+        if (nearRight && nearBottom && isInside) return { handle: 'rb', isInside: false };
+
+        if (nearLeft && inY && isInside) return { handle: 'l', isInside: false };
+        if (nearRight && inY && isInside) return { handle: 'r', isInside: false };
+        if (nearTop && inX && isInside) return { handle: 't', isInside: false };
+        if (nearBottom && inX && isInside) return { handle: 'b', isInside: false };
+
+        return { handle: null, isInside };
+    }
+
     function onMouseDown(e: MouseEvent) {
         const canvas = canvasRef.value;
 
@@ -286,16 +352,19 @@ export function useInteractions(
 
         if (toolsStore.activeTool === 'eraser') {
             if (topShape) {
-                canvasStore.deleteShape(topShape.id);
-                if (activeShape.value?.id === topShape.id) {
-                    activeShape.value = null;
+                if (canvasStore.selectedIds.includes(topShape.id)) {
+                    canvasStore.deleteSelectedShapes();
+                } else {
+                    canvasStore.deleteShape(topShape.id);
                 }
             }
             return;
         }
 
-        if (toolsStore.activeTool !== 'select') {
-            canvasStore.selectShape(null);
+        const creatingTools: ToolType[] = ['rect', 'circle', 'line', 'triangle', 'polygon', 'star', 'hexagon', 'arrow'];
+
+        if (creatingTools.includes(toolsStore.activeTool)) {
+            canvasStore.clearSelection();
             activeShape.value = null;
             isCreating.value = true;
             createStart.value = point;
@@ -311,32 +380,127 @@ export function useInteractions(
             return;
         }
 
-        if (activeShape.value) {
-            const handle = detectResizeHandle(activeShape.value, point);
+        if (toolsStore.activeTool === 'select') {
+            if (canvasStore.selectedIds.length === 1 && activeShape.value) {
+                const handle = detectResizeHandle(activeShape.value, point);
+                if (handle) {
+                    e.preventDefault();
+                    isResizing.value = true;
+                    resizeHandle.value = handle;
+                    hasMoved.value = false;
 
-            if (handle) {
-                isResizing.value = true;
-                resizeHandle.value = handle;
+                    resizeStartLocalBox.value = activeShape.value.getLocalBox();
+                    resizeStartMatrix.value = activeShape.value.getMatrix();
+                    resizeStartInverse.value = activeShape.value.getInverseMatrix();
+                    resizeStartScale.value = {
+                        x: activeShape.value.scaleX,
+                        y: activeShape.value.scaleY
+                    };
+                    resizeStartPosition.value = {
+                        x: activeShape.value.position.x,
+                        y: activeShape.value.position.y
+                    };
 
-                resizeStartLocalBox.value = activeShape.value.getLocalBox();
-                resizeStartMatrix.value = activeShape.value.getMatrix();
-                resizeStartInverse.value = activeShape.value.getInverseMatrix();
+                    if (activeShape.value.type === 'line') {
+                        const line = activeShape.value as LineShape;
+                        if (line.localEndPoint)
+                            lineStartLocal.value = { ...line.localEndPoint };
+                    }
 
-                if (activeShape.value.type === 'line') {
-                    const line = activeShape.value as LineShape;
-                    if (line.localEndPoint)
-                        lineStartLocal.value = { ...line.localEndPoint };
+                    if (canvas) {
+                        canvas.style.cursor = getCursorStyle(handle, activeShape.value);
+                    }
+                    return;
                 }
-                return;
             }
-        }
 
-        canvasStore.selectShape(topShape?.id ?? null);
-        activeShape.value = topShape;
+            if (canvasStore.selectedIds.length > 1) {
+                const { handle, isInside } = hitTestSelectionBox(point);
 
-        if (topShape) {
-            isDragging.value = true;
-            dragStart.value = point;
+                if (handle) {
+                    e.preventDefault();
+                    isResizingMultiple.value = true;
+                    resizeHandle.value = handle;
+                    hasMoved.value = false;
+
+                    multiResizeStates.value.clear();
+                    canvasStore.selectedShapes.forEach(shape => {
+                        multiResizeStates.value.set(shape.id, {
+                            shape,
+                            startLocalBox: shape.getLocalBox(),
+                            startMatrix: shape.getMatrix(),
+                            startInverse: shape.getInverseMatrix(),
+                            startScale: { x: shape.scaleX, y: shape.scaleY },
+                            startPosition: { x: shape.position.x, y: shape.position.y },
+                            startLocalEndPoint: shape.type === 'line' ? { ...(shape as LineShape).localEndPoint } : undefined
+                        });
+                    });
+
+                    selectionStartBox.value = getVisualSelectionBox();
+                    dragStart.value = point;
+
+                    if (canvas) {
+                        const firstShape = canvasStore.selectedShapes[0];
+                        if (firstShape) {
+                            canvas.style.cursor = getCursorStyle(handle, firstShape);
+                        }
+                    }
+                    return;
+                }
+
+                if (isInside) {
+                    e.preventDefault();
+                    isDraggingMultiple.value = true;
+                    dragStart.value = point;
+                    hasMoved.value = false;
+
+                    dragStartPositions.value.clear();
+                    canvasStore.selectedShapes.forEach(shape => {
+                        dragStartPositions.value.set(shape.id, {
+                            x: shape.position.x,
+                            y: shape.position.y
+                        });
+                    });
+
+                    selectionStartBox.value = getVisualSelectionBox();
+
+                    if (canvas) {
+                        canvas.style.cursor = 'grabbing';
+                    }
+                    return;
+                }
+            }
+
+            if (topShape) {
+                const isSelected = canvasStore.selectedIds.includes(topShape.id);
+
+                if (!isSelected) {
+                    if (e.shiftKey) {
+                        canvasStore.selectShape(topShape.id, true);
+                    } else {
+                        canvasStore.selectShape(topShape.id, false);
+                    }
+                }
+
+                if (canvasStore.selectedIds.length === 1 && canvasStore.selectedIds.includes(topShape.id)) {
+                    e.preventDefault();
+                    isDragging.value = true;
+                    dragStart.value = point;
+                    dragStartPosition.value = { x: topShape.position.x, y: topShape.position.y };
+                    activeShape.value = topShape;
+                    hasMoved.value = false;
+
+                    if (canvas) {
+                        canvas.style.cursor = 'grabbing';
+                    }
+                }
+            } else {
+                if (!e.shiftKey) {
+                    canvasStore.clearSelection();
+                }
+                canvasStore.startSelection(point);
+            }
+            return;
         }
     }
 
@@ -353,6 +517,147 @@ export function useInteractions(
                 panStart.value = { x: e.clientX, y: e.clientY };
             }
             canvas.style.cursor = 'grabbing';
+            return;
+        }
+
+        if (isDraggingMultiple.value) {
+            if (!dragStartPositions.value.size || !selectionStartBox.value) {
+                return;
+            }
+
+            const dx = point.x - dragStart.value.x;
+            const dy = point.y - dragStart.value.y;
+
+            if (!hasMoved.value) {
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < DRAG_THRESHOLD) {
+                    return;
+                }
+                hasMoved.value = true;
+            }
+
+            if (!hasRecordedInteraction.value && hasMoved.value) {
+                canvasStore.startInteraction();
+                hasRecordedInteraction.value = true;
+            }
+
+            dragStartPositions.value.forEach((startPos, id) => {
+                const shape = shapes.value.find(s => s.id === id);
+                if (shape) {
+                    shape.position.x = startPos.x + dx;
+                    shape.position.y = startPos.y + dy;
+                }
+            });
+
+            if (canvasStore.selectionRect && selectionStartBox.value) {
+                canvasStore.selectionRect.start.x = selectionStartBox.value.minX + dx;
+                canvasStore.selectionRect.start.y = selectionStartBox.value.minY + dy;
+                canvasStore.selectionRect.end.x = selectionStartBox.value.maxX + dx;
+                canvasStore.selectionRect.end.y = selectionStartBox.value.maxY + dy;
+            }
+
+            canvas.style.cursor = 'grabbing';
+            return;
+        }
+
+        if (isResizingMultiple.value && resizeHandle.value && selectionStartBox.value) {
+            const dx = point.x - dragStart.value.x;
+            const dy = point.y - dragStart.value.y;
+
+            if (!hasMoved.value) {
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < DRAG_THRESHOLD) {
+                    return;
+                }
+                hasMoved.value = true;
+            }
+
+            if (!hasRecordedInteraction.value && hasMoved.value) {
+                canvasStore.startInteraction();
+                hasRecordedInteraction.value = true;
+            }
+
+            const handle = resizeHandle.value;
+            const shift = e.shiftKey;
+            const startBox = selectionStartBox.value;
+
+            let newMinX = startBox.minX, newMaxX = startBox.maxX;
+            let newMinY = startBox.minY, newMaxY = startBox.maxY;
+
+            const deltaX = point.x - dragStart.value.x;
+            const deltaY = point.y - dragStart.value.y;
+
+            if (handle.includes('l')) newMinX = startBox.minX + deltaX;
+            if (handle.includes('r')) newMaxX = startBox.maxX + deltaX;
+            if (handle.includes('t')) newMinY = startBox.minY + deltaY;
+            if (handle.includes('b')) newMaxY = startBox.maxY + deltaY;
+
+            if (newMinX > newMaxX) [newMinX, newMaxX] = [newMaxX, newMinX];
+            if (newMinY > newMaxY) [newMinY, newMaxY] = [newMaxY, newMinY];
+
+            if (shift && ['lt', 'rt', 'lb', 'rb'].includes(handle)) {
+                const width = newMaxX - newMinX;
+                const height = newMaxY - newMinY;
+                const size = Math.max(width, height);
+
+                if (handle.includes('l')) newMinX = newMaxX - size;
+                else if (handle.includes('r')) newMaxX = newMinX + size;
+
+                if (handle.includes('t')) newMinY = newMaxY - size;
+                else if (handle.includes('b')) newMaxY = newMinY + size;
+            }
+
+            const newWidth = Math.max(1, newMaxX - newMinX);
+            const newHeight = Math.max(1, newMaxY - newMinY);
+            const oldWidth = Math.max(1, startBox.maxX - startBox.minX);
+            const oldHeight = Math.max(1, startBox.maxY - startBox.minY);
+
+            const scaleX = newWidth / oldWidth;
+            const scaleY = newHeight / oldHeight;
+
+            multiResizeStates.value.forEach((state) => {
+                const shape = state.shape;
+
+                const oldCenterX = (startBox.minX + startBox.maxX) / 2;
+                const oldCenterY = (startBox.minY + startBox.maxY) / 2;
+
+                const newCenterX = (newMinX + newMaxX) / 2;
+                const newCenterY = (newMinY + newMaxY) / 2;
+
+                const relX = oldWidth === 0 ? 0 : (state.startPosition.x - oldCenterX) / (oldWidth / 2);
+                const relY = oldHeight === 0 ? 0 : (state.startPosition.y - oldCenterY) / (oldHeight / 2);
+
+                shape.position.x = newCenterX + relX * (newWidth / 2);
+                shape.position.y = newCenterY + relY * (newHeight / 2);
+
+                if (shape.type !== 'line') {
+                    const localBox = state.startLocalBox;
+                    const newLocalWidth = (localBox.maxX - localBox.minX) * scaleX;
+                    const newLocalHeight = (localBox.maxY - localBox.minY) * scaleY;
+                    shape.setSize(Math.max(1, newLocalWidth), Math.max(1, newLocalHeight));
+                } else {
+                    const line = shape as LineShape;
+                    if (line.localEndPoint && state.startLocalEndPoint) {
+                        line.localEndPoint.x = state.startLocalEndPoint.x * scaleX;
+                        line.localEndPoint.y = state.startLocalEndPoint.y * scaleY;
+                    }
+                }
+            });
+
+            if (canvasStore.selectionRect) {
+                canvasStore.selectionRect.start = { x: newMinX, y: newMinY };
+                canvasStore.selectionRect.end = { x: newMaxX, y: newMaxY };
+            }
+
+            const firstSelectedShape = canvasStore.selectedShapes[0];
+            if (firstSelectedShape) {
+                canvas.style.cursor = getCursorStyle(handle, firstSelectedShape);
+            }
+            return;
+        }
+
+        if (canvasStore.isSelecting) {
+            canvasStore.updateSelection(point);
             return;
         }
 
@@ -436,12 +741,23 @@ export function useInteractions(
             const handle = resizeHandle.value;
             const shift = e.shiftKey;
 
-            // 1. Поворот
-            if (handle === 'rot') {
-                if (!hasRecordedInteraction.value) {
-                    canvasStore.startInteraction();
-                    hasRecordedInteraction.value = true;
+            const dx = point.x - dragStart.value.x;
+            const dy = point.y - dragStart.value.y;
+
+            if (!hasMoved.value) {
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < DRAG_THRESHOLD) {
+                    return;
                 }
+                hasMoved.value = true;
+            }
+
+            if (!hasRecordedInteraction.value && hasMoved.value) {
+                canvasStore.startInteraction();
+                hasRecordedInteraction.value = true;
+            }
+
+            if (handle === 'rot') {
                 const center = activeShape.value.position;
                 const angle = Math.atan2(
                     point.y - center.y,
@@ -449,7 +765,6 @@ export function useInteractions(
                 );
 
                 const deg = (angle + Math.PI / 2) * (180 / Math.PI);
-
                 activeShape.value.rotation = (deg + 360) % 360;
 
                 canvas.style.cursor = getCursorStyle(handle, activeShape.value);
@@ -460,26 +775,20 @@ export function useInteractions(
                 !resizeStartInverse.value ||
                 !resizeStartMatrix.value ||
                 !resizeStartLocalBox.value
-            )
+            ) {
                 return;
+            }
 
             const mInv = resizeStartInverse.value;
             const mStart = resizeStartMatrix.value;
             const startBox = resizeStartLocalBox.value;
 
-            const localMouse = new DOMPoint(point.x, point.y).matrixTransform(
-                mInv
-            );
+            const localMouse = new DOMPoint(point.x, point.y).matrixTransform(mInv);
 
-            // 2. Специфичный ресайз линии (за точки)
             if (
                 activeShape.value.type === 'line' &&
                 (handle === 's' || handle === 'e')
             ) {
-                if (!hasRecordedInteraction.value) {
-                    canvasStore.startInteraction();
-                    hasRecordedInteraction.value = true;
-                }
                 const line = activeShape.value as LineShape;
 
                 if (lineStartLocal.value) {
@@ -491,8 +800,7 @@ export function useInteractions(
                             lineStartLocal.value.y
                         ).matrixTransform(mStart);
                         const newInv = activeShape.value.getInverseMatrix();
-                        const newLocalEnd =
-                            oldGlobalEnd.matrixTransform(newInv);
+                        const newLocalEnd = oldGlobalEnd.matrixTransform(newInv);
                         line.localEndPoint = {
                             x: newLocalEnd.x,
                             y: newLocalEnd.y,
@@ -508,15 +816,8 @@ export function useInteractions(
                 return;
             }
 
-            // 3. Общий ресайз рамкой (для всего остального)
-            if (!hasRecordedInteraction.value) {
-                canvasStore.startInteraction();
-                hasRecordedInteraction.value = true;
-            }
-            let nMinX = startBox.minX,
-                nMaxX = startBox.maxX;
-            let nMinY = startBox.minY,
-                nMaxY = startBox.maxY;
+            let nMinX = startBox.minX, nMaxX = startBox.maxX;
+            let nMinY = startBox.minY, nMaxY = startBox.maxY;
 
             let moveX = localMouse.x;
             let moveY = localMouse.y;
@@ -525,12 +826,8 @@ export function useInteractions(
                 const origW = startBox.maxX - startBox.minX;
                 const origH = startBox.maxY - startBox.minY;
 
-                const fixedX = handle.includes('l')
-                    ? startBox.maxX
-                    : startBox.minX;
-                const fixedY = handle.includes('t')
-                    ? startBox.maxY
-                    : startBox.minY;
+                const fixedX = handle.includes('l') ? startBox.maxX : startBox.minX;
+                const fixedY = handle.includes('t') ? startBox.maxY : startBox.minY;
 
                 const deltaX = localMouse.x - fixedX;
                 const deltaY = localMouse.y - fixedY;
@@ -571,17 +868,11 @@ export function useInteractions(
             const newWidth = Math.abs(nMaxX - nMinX);
             const newHeight = Math.abs(nMaxY - nMinY);
 
-            activeShape.value.setSize(
-                Math.max(1, newWidth),
-                Math.max(1, newHeight)
-            );
+            activeShape.value.setSize(Math.max(1, newWidth), Math.max(1, newHeight));
 
             const localCenterX = (nMinX + nMaxX) / 2;
             const localCenterY = (nMinY + nMaxY) / 2;
-            const newGlobalCenter = new DOMPoint(
-                localCenterX,
-                localCenterY
-            ).matrixTransform(mStart);
+            const newGlobalCenter = new DOMPoint(localCenterX, localCenterY).matrixTransform(mStart);
 
             activeShape.value.position.x = newGlobalCenter.x;
             activeShape.value.position.y = newGlobalCenter.y;
@@ -590,9 +881,7 @@ export function useInteractions(
             const startScaleY = resizeStartScale.value.y;
 
             if (handle.includes('l') || handle.includes('r')) {
-                const fixedX = handle.includes('l')
-                    ? startBox.maxX
-                    : startBox.minX;
+                const fixedX = handle.includes('l') ? startBox.maxX : startBox.minX;
                 const expectedDir = handle.includes('l') ? -1 : 1;
                 const actualDir = Math.sign(moveX - fixedX) || expectedDir;
                 const sign = actualDir === expectedDir ? 1 : -1;
@@ -600,9 +889,7 @@ export function useInteractions(
             }
 
             if (handle.includes('t') || handle.includes('b')) {
-                const fixedY = handle.includes('t')
-                    ? startBox.maxY
-                    : startBox.minY;
+                const fixedY = handle.includes('t') ? startBox.maxY : startBox.minY;
                 const expectedDir = handle.includes('t') ? -1 : 1;
                 const actualDir = Math.sign(moveY - fixedY) || expectedDir;
                 const sign = actualDir === expectedDir ? 1 : -1;
@@ -616,17 +903,122 @@ export function useInteractions(
         if (isDragging.value && activeShape.value) {
             const dx = point.x - dragStart.value.x;
             const dy = point.y - dragStart.value.y;
-            if (!hasRecordedInteraction.value && (dx !== 0 || dy !== 0)) {
+
+            if (!hasMoved.value) {
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < DRAG_THRESHOLD) {
+                    return;
+                }
+                hasMoved.value = true;
+            }
+
+            if (!hasRecordedInteraction.value && hasMoved.value) {
                 canvasStore.startInteraction();
                 hasRecordedInteraction.value = true;
             }
-            activeShape.value.move({ x: dx, y: dy });
-            dragStart.value = point;
+
+            activeShape.value.position.x = dragStartPosition.value.x + dx;
+            activeShape.value.position.y = dragStartPosition.value.y + dy;
+
             canvas.style.cursor = 'grabbing';
             return;
         }
 
-        if (activeShape.value) {
+        if (canvasStore.selectedIds.length > 0 && canvasStore.selectionRect) {
+            const selectionBox = {
+                minX: Math.min(canvasStore.selectionRect.start.x, canvasStore.selectionRect.end.x),
+                minY: Math.min(canvasStore.selectionRect.start.y, canvasStore.selectionRect.end.y),
+                maxX: Math.max(canvasStore.selectionRect.start.x, canvasStore.selectionRect.end.x),
+                maxY: Math.max(canvasStore.selectionRect.start.y, canvasStore.selectionRect.end.y)
+            };
+
+            const padding = SELECTION_PADDING;
+            const edgeThreshold = 8;
+
+            const expandedBox = {
+                minX: selectionBox.minX - padding,
+                maxX: selectionBox.maxX + padding,
+                minY: selectionBox.minY - padding,
+                maxY: selectionBox.maxY + padding
+            };
+
+            const nearLeft = Math.abs(point.x - selectionBox.minX) <= edgeThreshold;
+            const nearRight = Math.abs(point.x - selectionBox.maxX) <= edgeThreshold;
+            const nearTop = Math.abs(point.y - selectionBox.minY) <= edgeThreshold;
+            const nearBottom = Math.abs(point.y - selectionBox.maxY) <= edgeThreshold;
+
+            const inY = point.y >= expandedBox.minY && point.y <= expandedBox.maxY;
+            const inX = point.x >= expandedBox.minX && point.x <= expandedBox.maxX;
+            const isInside = point.x >= expandedBox.minX &&
+                point.x <= expandedBox.maxX &&
+                point.y >= expandedBox.minY &&
+                point.y <= expandedBox.maxY;
+
+            if (isInside) {
+                if (nearLeft && nearTop) {
+                    const firstShape = canvasStore.selectedShapes[0];
+                    if (firstShape) {
+                        canvas.style.cursor = getCursorStyle('lt', firstShape);
+                        return;
+                    }
+                }
+                if (nearRight && nearTop) {
+                    const firstShape = canvasStore.selectedShapes[0];
+                    if (firstShape) {
+                        canvas.style.cursor = getCursorStyle('rt', firstShape);
+                        return;
+                    }
+                }
+                if (nearLeft && nearBottom) {
+                    const firstShape = canvasStore.selectedShapes[0];
+                    if (firstShape) {
+                        canvas.style.cursor = getCursorStyle('lb', firstShape);
+                        return;
+                    }
+                }
+                if (nearRight && nearBottom) {
+                    const firstShape = canvasStore.selectedShapes[0];
+                    if (firstShape) {
+                        canvas.style.cursor = getCursorStyle('rb', firstShape);
+                        return;
+                    }
+                }
+
+                if (nearLeft && inY) {
+                    const firstShape = canvasStore.selectedShapes[0];
+                    if (firstShape) {
+                        canvas.style.cursor = getCursorStyle('l', firstShape);
+                        return;
+                    }
+                }
+                if (nearRight && inY) {
+                    const firstShape = canvasStore.selectedShapes[0];
+                    if (firstShape) {
+                        canvas.style.cursor = getCursorStyle('r', firstShape);
+                        return;
+                    }
+                }
+                if (nearTop && inX) {
+                    const firstShape = canvasStore.selectedShapes[0];
+                    if (firstShape) {
+                        canvas.style.cursor = getCursorStyle('t', firstShape);
+                        return;
+                    }
+                }
+                if (nearBottom && inX) {
+                    const firstShape = canvasStore.selectedShapes[0];
+                    if (firstShape) {
+                        canvas.style.cursor = getCursorStyle('b', firstShape);
+                        return;
+                    }
+                }
+
+                canvas.style.cursor = 'grab';
+                return;
+            }
+        }
+
+        if (activeShape.value && canvasStore.selectedIds.length === 1) {
             const handle = detectResizeHandle(activeShape.value, point);
             if (handle) {
                 canvas.style.cursor = getCursorStyle(handle, activeShape.value);
@@ -639,7 +1031,12 @@ export function useInteractions(
             canvas.style.cursor = 'grab';
             return;
         }
-        canvas.style.cursor = topShape ? 'grab' : 'default';
+
+        if (toolsStore.activeTool === 'select') {
+            canvas.style.cursor = topShape ? 'grab' : 'default';
+        } else {
+            canvas.style.cursor = 'default';
+        }
     }
 
     function onMouseUp(e: MouseEvent) {
@@ -651,6 +1048,31 @@ export function useInteractions(
                     toolsStore.activeTool === 'hand' ? 'grab' : 'default';
             }
             return;
+        }
+
+        if (canvasStore.isSelecting) {
+            canvasStore.endSelection();
+        }
+
+        if (hasMoved.value) {
+            if (hasRecordedInteraction.value) {
+                canvasStore.endInteraction();
+            }
+        } else {
+            if (hasRecordedInteraction.value) {
+                hasRecordedInteraction.value = false;
+            }
+        }
+
+        if (isDraggingMultiple.value || isResizingMultiple.value) {
+            if (hasRecordedInteraction.value) {
+                canvasStore.endInteraction();
+            }
+            isDraggingMultiple.value = false;
+            isResizingMultiple.value = false;
+            multiResizeStates.value.clear();
+            selectionStartBox.value = null;
+            dragStartPositions.value.clear();
         }
 
         if (isCreating.value) {
@@ -681,9 +1103,7 @@ export function useInteractions(
             return;
         }
 
-        if (hasRecordedInteraction.value) {
-            canvasStore.endInteraction();
-        }
+        hasMoved.value = false;
         hasRecordedInteraction.value = false;
         isDragging.value = false;
         isResizing.value = false;
@@ -720,5 +1140,5 @@ export function useInteractions(
         };
     }
 
-    return { attachListeners };
+    return { attachListeners, updateTransform };
 }

@@ -1,16 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
-import type { Shape } from '@/canvas/types';
+import type { Shape, Point } from '@/canvas/types';
 import { shapeRegistry } from '@/canvas/types';
 import { generateId } from '@/canvas/utils/math';
 import { PolygonShape } from '@/canvas/types/polygon/polygon';
-import {
-    createCanvas,
-    getCanvasById,
-    updateCanvas,
-    CanvasApiError,
-    CanvasNotFoundError,
-} from '@/api/api';
 
 interface ShapeParams extends Record<string, unknown> {
     sides?: number;
@@ -38,14 +31,8 @@ type SerializedShape = SerializedShapeBase & Record<string, unknown>;
 
 type SceneSnapshot = {
     shapes: SerializedShape[];
-    selectedId: string | null;
-};
-
-type CanvasStorageData = {
-    documentId: string;
-    isOfflineMode: boolean;
-    shapes: SerializedShape[];
-    selectedId: string | null;
+    selectedIds: string[];
+    selectionRect?: { start: Point; end: Point } | null;
 };
 
 type VectorEditorExport = {
@@ -57,7 +44,26 @@ type VectorEditorExport = {
 
 export const useCanvasStore = defineStore('canvas', () => {
     const shapes = ref<Shape[]>([]);
-    const selectedId = ref<string | null>(null);
+    const selectedIds = ref<string[]>([]);
+
+    const selectedId = computed({
+        get: () => selectedIds.value[0] || null,
+        set: (id) => {
+            if (id) {
+                selectedIds.value = [id];
+            } else {
+                selectedIds.value = [];
+            }
+        },
+    });
+
+    const selectionBox = ref<{ start: Point | null; end: Point | null }>({
+        start: null,
+        end: null,
+    });
+    const selectionRect = ref<{ start: Point; end: Point } | null>(null);
+    const isSelecting = ref(false);
+    const dragStartPositions = ref<Map<string, Point>>(new Map());
 
     const undoStack = ref<SceneSnapshot[]>([]);
     const redoStack = ref<SceneSnapshot[]>([]);
@@ -77,8 +83,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     let continuousChangeTimer: number | null = null;
     const CONTINUOUS_CHANGE_TIMEOUT = 700;
 
+    const selectedShapes = computed(() =>
+        shapes.value.filter((s) => selectedIds.value.includes(s.id))
+    );
+
+    const hasSelection = computed(() => selectedIds.value.length > 0);
+    const selectionCount = computed(() => selectedIds.value.length);
+
     const selectedShape = computed(
-        () => shapes.value.find((s) => s.id === selectedId.value) ?? null
+        () => shapes.value.find((s) => s.id === selectedIds.value[0]) ?? null
     );
 
     function serializeShape(shape: Shape): SerializedShape {
@@ -95,7 +108,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     function createSnapshot(): SceneSnapshot {
         return {
             shapes: shapes.value.map((s) => serializeShape(s)),
-            selectedId: selectedId.value,
+            selectedIds: [...selectedIds.value],
+            selectionRect: selectionRect.value
+                ? { ...selectionRect.value }
+                : null,
         };
     }
 
@@ -108,16 +124,12 @@ export const useCanvasStore = defineStore('canvas', () => {
         });
 
         shapes.value = restored;
-        selectedId.value = snapshot.selectedId;
-    }
-
-    function snapshotToServerContent(
-        snapshot: SceneSnapshot
-    ): Record<string, unknown> {
-        return {
-            shapes: snapshot.shapes,
-            selectedId: snapshot.selectedId,
-        };
+        selectedIds.value = snapshot.selectedIds || [];
+        if (snapshot.selectionRect) {
+            selectionRect.value = { ...snapshot.selectionRect };
+        } else {
+            selectionRect.value = null;
+        }
     }
 
     function pushHistory() {
@@ -178,6 +190,155 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const canUndo = computed(() => undoStack.value.length > 0);
     const canRedo = computed(() => redoStack.value.length > 0);
+
+    function selectShape(id: string | null, addToSelection: boolean = false) {
+        if (!id) {
+            if (!addToSelection) {
+                selectedIds.value = [];
+                selectionRect.value = null;
+            }
+            return;
+        }
+
+        if (addToSelection) {
+            if (selectedIds.value.includes(id)) {
+                selectedIds.value = selectedIds.value.filter((i) => i !== id);
+            } else {
+                selectedIds.value = [...selectedIds.value, id];
+            }
+        } else {
+            selectedIds.value = [id];
+            selectionRect.value = null;
+        }
+    }
+
+    function selectShapesInRect(rect: {
+        minX: number;
+        minY: number;
+        maxX: number;
+        maxY: number;
+    }) {
+        selectedIds.value = shapes.value
+            .filter((shape) => {
+                const box = shape.getBoundingBox();
+                return !(
+                    box.maxX < rect.minX ||
+                    box.minX > rect.maxX ||
+                    box.maxY < rect.minY ||
+                    box.minY > rect.maxY
+                );
+            })
+            .map((s) => s.id);
+
+        if (selectedIds.value.length > 0) {
+            selectionRect.value = {
+                start: { x: rect.minX, y: rect.minY },
+                end: { x: rect.maxX, y: rect.maxY },
+            };
+        } else {
+            selectionRect.value = null;
+        }
+    }
+
+    function startSelection(startPoint: Point) {
+        selectionBox.value = { start: startPoint, end: startPoint };
+        selectionRect.value = null;
+        isSelecting.value = true;
+    }
+
+    function updateSelection(endPoint: Point) {
+        if (isSelecting.value && selectionBox.value.start) {
+            selectionBox.value.end = endPoint;
+        }
+    }
+
+    function endSelection() {
+        if (
+            isSelecting.value &&
+            selectionBox.value.start &&
+            selectionBox.value.end
+        ) {
+            const start = selectionBox.value.start;
+            const end = selectionBox.value.end;
+
+            const rect = {
+                minX: Math.min(start.x, end.x),
+                minY: Math.min(start.y, end.y),
+                maxX: Math.max(start.x, end.x),
+                maxY: Math.max(start.y, end.y),
+            };
+
+            selectShapesInRect(rect);
+        }
+
+        selectionBox.value = { start: null, end: null };
+        isSelecting.value = false;
+    }
+
+    function setDragStartPositions() {
+        dragStartPositions.value.clear();
+        selectedShapes.value.forEach((shape) => {
+            dragStartPositions.value.set(shape.id, { ...shape.position });
+        });
+    }
+
+    function moveSelectedShapes(delta: Point) {
+        selectedShapes.value.forEach((shape) => {
+            const startPos = dragStartPositions.value.get(shape.id);
+            if (startPos) {
+                shape.position.x = startPos.x + delta.x;
+                shape.position.y = startPos.y + delta.y;
+            }
+        });
+
+        if (selectionRect.value) {
+            selectionRect.value.start.x += delta.x;
+            selectionRect.value.start.y += delta.y;
+            selectionRect.value.end.x += delta.x;
+            selectionRect.value.end.y += delta.y;
+        }
+    }
+
+    function deleteSelectedShapes() {
+        if (selectedIds.value.length === 0) return;
+
+        pushHistory();
+        shapes.value = shapes.value.filter(
+            (s) => !selectedIds.value.includes(s.id)
+        );
+        selectedIds.value = [];
+        selectionRect.value = null;
+    }
+
+    function selectAll() {
+        if (shapes.value.length === 0) return;
+
+        selectedIds.value = shapes.value.map((s) => s.id);
+        if (selectedIds.value.length > 0) {
+            const allPoints = shapes.value.flatMap((s) => {
+                const box = s.getBoundingBox();
+                return [
+                    { x: box.minX, y: box.minY },
+                    { x: box.maxX, y: box.maxY },
+                ];
+            });
+
+            const minX = Math.min(...allPoints.map((p) => p.x));
+            const minY = Math.min(...allPoints.map((p) => p.y));
+            const maxX = Math.max(...allPoints.map((p) => p.x));
+            const maxY = Math.max(...allPoints.map((p) => p.y));
+
+            selectionRect.value = {
+                start: { x: minX, y: minY },
+                end: { x: maxX, y: maxY },
+            };
+        }
+    }
+
+    function clearSelection() {
+        selectedIds.value = [];
+        selectionRect.value = null;
+    }
 
     function addShape(
         type: string,
@@ -253,7 +414,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     function deleteShape(id: string) {
         pushHistory();
         shapes.value = shapes.value.filter((s) => s.id !== id);
-        if (selectedId.value === id) selectedId.value = null;
+        selectedIds.value = selectedIds.value.filter((i) => i !== id);
+        if (selectedIds.value.length === 0) {
+            selectionRect.value = null;
+        }
     }
 
     function moveShape(fromIndex: number, toIndex: number) {
@@ -276,20 +440,69 @@ export const useCanvasStore = defineStore('canvas', () => {
         shapes.value = next;
     }
 
-    function selectShape(id: string | null) {
-        selectedId.value = id;
-    }
-
     function setZoom(value: number) {
-        zoom.value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value)));
+        const newZoom = Math.max(
+            MIN_ZOOM,
+            Math.min(MAX_ZOOM, Math.round(value))
+        );
+        if (newZoom === zoom.value) return;
+
+        // Сохраняем мировую точку, которая сейчас в центре экрана
+        const worldCenterX = -pan.value.x / (zoom.value / 100);
+        const worldCenterY = -pan.value.y / (zoom.value / 100);
+
+        // Новый pan для того же центра
+        const newZoomFactor = newZoom / 100;
+        const newPanX = -worldCenterX * newZoomFactor;
+        const newPanY = -worldCenterY * newZoomFactor;
+
+        zoom.value = newZoom;
+        pan.value = { x: newPanX, y: newPanY };
     }
 
     function zoomIn() {
-        setZoom(zoom.value + ZOOM_STEP);
+        zoomAtCenter(ZOOM_STEP);
     }
 
     function zoomOut() {
-        setZoom(zoom.value - ZOOM_STEP);
+        zoomAtCenter(-ZOOM_STEP);
+    }
+
+    function zoomAtCenter(delta: number) {
+        // Получаем размеры канваса из переданного референса или ищем по классу
+        const canvasEl = document.querySelector(
+            '.main-canvas'
+        ) as HTMLCanvasElement | null;
+        const rect = canvasEl?.getBoundingClientRect();
+
+        if (!rect) {
+            // Если канвас не найден, просто меняем зум без коррекции pan
+            zoom.value = Math.max(
+                MIN_ZOOM,
+                Math.min(MAX_ZOOM, zoom.value + delta)
+            );
+            return;
+        }
+
+        // Какая мировая точка сейчас в центре экрана?
+        // Используем ту же математику, что и в getLocalPoint
+        const zoomFactor = zoom.value / 100;
+        const worldCenterX = -pan.value.x / zoomFactor;
+        const worldCenterY = -pan.value.y / zoomFactor;
+
+        // Новый зум
+        const newZoom = Math.max(
+            MIN_ZOOM,
+            Math.min(MAX_ZOOM, zoom.value + delta)
+        );
+        const newZoomFactor = newZoom / 100;
+
+        // Новый pan для того же центра
+        const newPanX = -worldCenterX * newZoomFactor;
+        const newPanY = -worldCenterY * newZoomFactor;
+
+        zoom.value = newZoom;
+        pan.value = { x: newPanX, y: newPanY };
     }
 
     function setPan(value: { x: number; y: number }) {
@@ -307,11 +520,11 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function saveToLocalStorage() {
         try {
-            const data: CanvasStorageData = {
-                documentId: documentId.value,
-                isOfflineMode: isOfflineMode.value,
+            const data = {
                 shapes: shapes.value.map(serializeShape),
-                selectedId: selectedId.value,
+                selectedIds: selectedIds.value,
+                zoom: zoom.value,
+                pan: pan.value,
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         } catch (e) {
@@ -334,7 +547,7 @@ export const useCanvasStore = defineStore('canvas', () => {
                 backgroundColor.value = savedBgColor;
             }
 
-            const restored: Shape[] = (data.shapes ?? []).map(
+            const restored: Shape[] = data.shapes.map(
                 (plain: SerializedShape) => {
                     const { type, id, position, ...rest } = plain;
                     const shape = shapeRegistry.create(type, id, position);
@@ -344,7 +557,9 @@ export const useCanvasStore = defineStore('canvas', () => {
             );
 
             shapes.value = restored;
-            selectedId.value = data.selectedId ?? null;
+            selectedIds.value = data.selectedIds || [];
+            if (data.zoom) zoom.value = data.zoom;
+            if (data.pan) pan.value = data.pan;
         } catch (e) {
             console.error('Ошибка загрузки:', e);
         }
@@ -526,13 +741,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     loadFromLocalStorage();
-    void initDocument();
 
     watch(
-        [shapes, selectedId, documentId, isOfflineMode],
+        [shapes, selectedIds, zoom, pan],
         () => {
             saveToLocalStorage();
-            void syncDocument();
         },
         { deep: true }
     );
@@ -540,35 +753,49 @@ export const useCanvasStore = defineStore('canvas', () => {
     return {
         shapes,
         selectedId,
-        MIN_ZOOM,
-        MAX_ZOOM,
-        ZOOM_STEP,
+        selectedIds,
+        selectedShapes,
+        hasSelection,
+        selectionCount,
         selectedShape,
+        selectionBox,
+        selectionRect,
+        isSelecting,
+        dragStartPositions,
+        zoom,
+        pan,
         addShape,
         updateShape,
         deleteShape,
         selectShape,
+        selectShapesInRect,
+        startSelection,
+        updateSelection,
+        endSelection,
+        setDragStartPositions,
+        moveSelectedShapes,
+        deleteSelectedShapes,
+        selectAll,
+        clearSelection,
         moveShape,
         undo,
         redo,
         canUndo,
         canRedo,
-        zoom,
         setZoom,
         zoomIn,
         zoomOut,
-        pan,
+        zoomAtCenter,
         setPan,
         movePan,
-        documentId,
-        isOfflineMode,
-        serverError,
-        openDocumentById,
         startInteraction,
         endInteraction,
         exportToJson,
         importFromJson,
         backgroundColor,
         setBackgroundColor,
+        MIN_ZOOM,
+        MAX_ZOOM,
+        ZOOM_STEP,
     };
 });

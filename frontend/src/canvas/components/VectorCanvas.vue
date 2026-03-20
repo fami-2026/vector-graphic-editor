@@ -12,11 +12,43 @@ const { shapes, selectedId, zoom, pan, backgroundColor } =
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-const { draw } = useCanvasRender(canvasRef, shapes, selectedId, zoom, pan);
+const { shapes, selectedId, zoom, pan } = storeToRefs(useCanvasStore());
+
+const { updateTransform } = useInteractions(canvasRef, shapes, zoom, pan);
+const { draw } = useCanvasRender(
+    canvasRef,
+    shapes,
+    selectedId,
+    zoom,
+    pan,
+    updateTransform
+);
 const { attachListeners } = useInteractions(canvasRef, shapes, zoom, pan);
 
 let resizeObserver: ResizeObserver | null = null;
 let detachListeners: (() => void) | undefined;
+
+const handleKeyDown = (e: KeyboardEvent) => {
+    if (
+        (e.key === 'Delete' || e.key === 'Backspace') &&
+        canvasStore.hasSelection
+    ) {
+        e.preventDefault();
+        canvasStore.deleteSelectedShapes();
+        draw();
+    }
+
+    if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        canvasStore.selectAll();
+        draw();
+    }
+
+    if (e.key === 'Escape') {
+        canvasStore.clearSelection();
+        draw();
+    }
+};
 
 const updateCanvasSize = () => {
     if (!containerRef.value || !canvasRef.value) return;
@@ -40,15 +72,26 @@ onMounted(() => {
     }
 
     detachListeners = attachListeners();
+    window.addEventListener('keydown', handleKeyDown);
 });
 
 onUnmounted(() => {
     resizeObserver?.disconnect();
     detachListeners?.();
+    window.removeEventListener('keydown', handleKeyDown);
 });
 
 watch(
-    [shapes, selectedId, zoom, pan, backgroundColor],
+    [
+        shapes,
+        selectedId,
+        zoom,
+        pan,
+        () => canvasStore.selectedIds,
+        () => canvasStore.isSelecting,
+        () => canvasStore.selectionBox,
+        () => canvasStore.selectionRect,
+    ],
     () => requestAnimationFrame(draw),
     { deep: true }
 );
@@ -57,6 +100,15 @@ watch(
 <template>
     <div ref="containerRef" class="canvas-wrapper">
         <canvas ref="canvasRef" class="main-canvas"></canvas>
+        <div v-if="canvasStore.hasSelection" class="selection-info">
+            <span>Выбрано: {{ canvasStore.selectionCount }}</span>
+            <button
+                @click="canvasStore.deleteSelectedShapes"
+                class="delete-btn"
+            >
+                Удалить
+            </button>
+        </div>
     </div>
 </template>
 
@@ -75,5 +127,35 @@ watch(
     width: 100%;
     height: 100%;
     cursor: default;
+}
+
+.selection-info {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 8px 16px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    z-index: 1000;
+    font-size: 14px;
+}
+
+.delete-btn {
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.delete-btn:hover {
+    background: #d32f2f;
 }
 </style>
