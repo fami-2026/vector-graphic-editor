@@ -281,17 +281,33 @@ export function useInteractions(
     }
 
     function getVisualSelectionBox(): BoundingBox | null {
-        if (!canvasStore.selectionRect || canvasStore.selectedIds.length === 0) return null;
+        if (!canvasStore.selectionRect || canvasStore.selectedIds.length === 0)
+            return null;
 
         return {
-            minX: Math.min(canvasStore.selectionRect.start.x, canvasStore.selectionRect.end.x),
-            minY: Math.min(canvasStore.selectionRect.start.y, canvasStore.selectionRect.end.y),
-            maxX: Math.max(canvasStore.selectionRect.start.x, canvasStore.selectionRect.end.x),
-            maxY: Math.max(canvasStore.selectionRect.start.y, canvasStore.selectionRect.end.y)
+            minX: Math.min(
+                canvasStore.selectionRect.start.x,
+                canvasStore.selectionRect.end.x
+            ),
+            minY: Math.min(
+                canvasStore.selectionRect.start.y,
+                canvasStore.selectionRect.end.y
+            ),
+            maxX: Math.max(
+                canvasStore.selectionRect.start.x,
+                canvasStore.selectionRect.end.x
+            ),
+            maxY: Math.max(
+                canvasStore.selectionRect.start.y,
+                canvasStore.selectionRect.end.y
+            ),
         };
     }
 
-    function hitTestSelectionBox(point: Point): { handle: ResizeHandle | null, isInside: boolean } {
+    function hitTestSelectionBox(point: Point): {
+        handle: ResizeHandle | null;
+        isInside: boolean;
+    } {
         const selectionBox = getVisualSelectionBox();
         if (!selectionBox) return { handle: null, isInside: false };
 
@@ -302,31 +318,41 @@ export function useInteractions(
             minX: selectionBox.minX - padding,
             maxX: selectionBox.maxX + padding,
             minY: selectionBox.minY - padding,
-            maxY: selectionBox.maxY + padding
+            maxY: selectionBox.maxY + padding,
         };
 
-        const isInside = point.x >= expandedBox.minX &&
+        const isInside =
+            point.x >= expandedBox.minX &&
             point.x <= expandedBox.maxX &&
             point.y >= expandedBox.minY &&
             point.y <= expandedBox.maxY;
 
         const nearLeft = Math.abs(point.x - selectionBox.minX) <= edgeThreshold;
-        const nearRight = Math.abs(point.x - selectionBox.maxX) <= edgeThreshold;
+        const nearRight =
+            Math.abs(point.x - selectionBox.maxX) <= edgeThreshold;
         const nearTop = Math.abs(point.y - selectionBox.minY) <= edgeThreshold;
-        const nearBottom = Math.abs(point.y - selectionBox.maxY) <= edgeThreshold;
+        const nearBottom =
+            Math.abs(point.y - selectionBox.maxY) <= edgeThreshold;
 
         const inY = point.y >= expandedBox.minY && point.y <= expandedBox.maxY;
         const inX = point.x >= expandedBox.minX && point.x <= expandedBox.maxX;
 
-        if (nearLeft && nearTop && isInside) return { handle: 'lt', isInside: false };
-        if (nearRight && nearTop && isInside) return { handle: 'rt', isInside: false };
-        if (nearLeft && nearBottom && isInside) return { handle: 'lb', isInside: false };
-        if (nearRight && nearBottom && isInside) return { handle: 'rb', isInside: false };
+        if (nearLeft && nearTop && isInside)
+            return { handle: 'lt', isInside: false };
+        if (nearRight && nearTop && isInside)
+            return { handle: 'rt', isInside: false };
+        if (nearLeft && nearBottom && isInside)
+            return { handle: 'lb', isInside: false };
+        if (nearRight && nearBottom && isInside)
+            return { handle: 'rb', isInside: false };
 
-        if (nearLeft && inY && isInside) return { handle: 'l', isInside: false };
-        if (nearRight && inY && isInside) return { handle: 'r', isInside: false };
+        if (nearLeft && inY && isInside)
+            return { handle: 'l', isInside: false };
+        if (nearRight && inY && isInside)
+            return { handle: 'r', isInside: false };
         if (nearTop && inX && isInside) return { handle: 't', isInside: false };
-        if (nearBottom && inX && isInside) return { handle: 'b', isInside: false };
+        if (nearBottom && inX && isInside)
+            return { handle: 'b', isInside: false };
 
         return { handle: null, isInside };
     }
@@ -361,7 +387,16 @@ export function useInteractions(
             return;
         }
 
-        const creatingTools: ToolType[] = ['rect', 'circle', 'line', 'triangle', 'polygon', 'star', 'hexagon', 'arrow'];
+        const creatingTools: ToolType[] = [
+            'rect',
+            'circle',
+            'line',
+            'triangle',
+            'polygon',
+            'star',
+            'hexagon',
+            'arrow',
+        ];
 
         if (creatingTools.includes(toolsStore.activeTool)) {
             canvasStore.clearSelection();
@@ -391,14 +426,15 @@ export function useInteractions(
 
                     resizeStartLocalBox.value = activeShape.value.getLocalBox();
                     resizeStartMatrix.value = activeShape.value.getMatrix();
-                    resizeStartInverse.value = activeShape.value.getInverseMatrix();
+                    resizeStartInverse.value =
+                        activeShape.value.getInverseMatrix();
                     resizeStartScale.value = {
                         x: activeShape.value.scaleX,
-                        y: activeShape.value.scaleY
+                        y: activeShape.value.scaleY,
                     };
                     resizeStartPosition.value = {
                         x: activeShape.value.position.x,
-                        y: activeShape.value.position.y
+                        y: activeShape.value.position.y,
                     };
 
                     if (activeShape.value.type === 'line') {
@@ -408,7 +444,10 @@ export function useInteractions(
                     }
 
                     if (canvas) {
-                        canvas.style.cursor = getCursorStyle(handle, activeShape.value);
+                        canvas.style.cursor = getCursorStyle(
+                            handle,
+                            activeShape.value
+                        );
                     }
                     return;
                 }
@@ -424,15 +463,21 @@ export function useInteractions(
                     hasMoved.value = false;
 
                     multiResizeStates.value.clear();
-                    canvasStore.selectedShapes.forEach(shape => {
+                    canvasStore.selectedShapes.forEach((shape) => {
                         multiResizeStates.value.set(shape.id, {
                             shape,
                             startLocalBox: shape.getLocalBox(),
                             startMatrix: shape.getMatrix(),
                             startInverse: shape.getInverseMatrix(),
                             startScale: { x: shape.scaleX, y: shape.scaleY },
-                            startPosition: { x: shape.position.x, y: shape.position.y },
-                            startLocalEndPoint: shape.type === 'line' ? { ...(shape as LineShape).localEndPoint } : undefined
+                            startPosition: {
+                                x: shape.position.x,
+                                y: shape.position.y,
+                            },
+                            startLocalEndPoint:
+                                shape.type === 'line'
+                                    ? { ...(shape as LineShape).localEndPoint }
+                                    : undefined,
                         });
                     });
 
@@ -442,7 +487,10 @@ export function useInteractions(
                     if (canvas) {
                         const firstShape = canvasStore.selectedShapes[0];
                         if (firstShape) {
-                            canvas.style.cursor = getCursorStyle(handle, firstShape);
+                            canvas.style.cursor = getCursorStyle(
+                                handle,
+                                firstShape
+                            );
                         }
                     }
                     return;
@@ -455,10 +503,10 @@ export function useInteractions(
                     hasMoved.value = false;
 
                     dragStartPositions.value.clear();
-                    canvasStore.selectedShapes.forEach(shape => {
+                    canvasStore.selectedShapes.forEach((shape) => {
                         dragStartPositions.value.set(shape.id, {
                             x: shape.position.x,
-                            y: shape.position.y
+                            y: shape.position.y,
                         });
                     });
 
@@ -472,7 +520,9 @@ export function useInteractions(
             }
 
             if (topShape) {
-                const isSelected = canvasStore.selectedIds.includes(topShape.id);
+                const isSelected = canvasStore.selectedIds.includes(
+                    topShape.id
+                );
 
                 if (!isSelected) {
                     if (e.shiftKey) {
@@ -482,11 +532,17 @@ export function useInteractions(
                     }
                 }
 
-                if (canvasStore.selectedIds.length === 1 && canvasStore.selectedIds.includes(topShape.id)) {
+                if (
+                    canvasStore.selectedIds.length === 1 &&
+                    canvasStore.selectedIds.includes(topShape.id)
+                ) {
                     e.preventDefault();
                     isDragging.value = true;
                     dragStart.value = point;
-                    dragStartPosition.value = { x: topShape.position.x, y: topShape.position.y };
+                    dragStartPosition.value = {
+                        x: topShape.position.x,
+                        y: topShape.position.y,
+                    };
                     activeShape.value = topShape;
                     hasMoved.value = false;
 
@@ -542,7 +598,7 @@ export function useInteractions(
             }
 
             dragStartPositions.value.forEach((startPos, id) => {
-                const shape = shapes.value.find(s => s.id === id);
+                const shape = shapes.value.find((s) => s.id === id);
                 if (shape) {
                     shape.position.x = startPos.x + dx;
                     shape.position.y = startPos.y + dy;
@@ -550,17 +606,25 @@ export function useInteractions(
             });
 
             if (canvasStore.selectionRect && selectionStartBox.value) {
-                canvasStore.selectionRect.start.x = selectionStartBox.value.minX + dx;
-                canvasStore.selectionRect.start.y = selectionStartBox.value.minY + dy;
-                canvasStore.selectionRect.end.x = selectionStartBox.value.maxX + dx;
-                canvasStore.selectionRect.end.y = selectionStartBox.value.maxY + dy;
+                canvasStore.selectionRect.start.x =
+                    selectionStartBox.value.minX + dx;
+                canvasStore.selectionRect.start.y =
+                    selectionStartBox.value.minY + dy;
+                canvasStore.selectionRect.end.x =
+                    selectionStartBox.value.maxX + dx;
+                canvasStore.selectionRect.end.y =
+                    selectionStartBox.value.maxY + dy;
             }
 
             canvas.style.cursor = 'grabbing';
             return;
         }
 
-        if (isResizingMultiple.value && resizeHandle.value && selectionStartBox.value) {
+        if (
+            isResizingMultiple.value &&
+            resizeHandle.value &&
+            selectionStartBox.value
+        ) {
             const dx = point.x - dragStart.value.x;
             const dy = point.y - dragStart.value.y;
 
@@ -581,8 +645,10 @@ export function useInteractions(
             const shift = e.shiftKey;
             const startBox = selectionStartBox.value;
 
-            let newMinX = startBox.minX, newMaxX = startBox.maxX;
-            let newMinY = startBox.minY, newMaxY = startBox.maxY;
+            let newMinX = startBox.minX,
+                newMaxX = startBox.maxX;
+            let newMinY = startBox.minY,
+                newMaxY = startBox.maxY;
 
             const deltaX = point.x - dragStart.value.x;
             const deltaY = point.y - dragStart.value.y;
@@ -624,22 +690,36 @@ export function useInteractions(
                 const newCenterX = (newMinX + newMaxX) / 2;
                 const newCenterY = (newMinY + newMaxY) / 2;
 
-                const relX = oldWidth === 0 ? 0 : (state.startPosition.x - oldCenterX) / (oldWidth / 2);
-                const relY = oldHeight === 0 ? 0 : (state.startPosition.y - oldCenterY) / (oldHeight / 2);
+                const relX =
+                    oldWidth === 0
+                        ? 0
+                        : (state.startPosition.x - oldCenterX) / (oldWidth / 2);
+                const relY =
+                    oldHeight === 0
+                        ? 0
+                        : (state.startPosition.y - oldCenterY) /
+                          (oldHeight / 2);
 
                 shape.position.x = newCenterX + relX * (newWidth / 2);
                 shape.position.y = newCenterY + relY * (newHeight / 2);
 
                 if (shape.type !== 'line') {
                     const localBox = state.startLocalBox;
-                    const newLocalWidth = (localBox.maxX - localBox.minX) * scaleX;
-                    const newLocalHeight = (localBox.maxY - localBox.minY) * scaleY;
-                    shape.setSize(Math.max(1, newLocalWidth), Math.max(1, newLocalHeight));
+                    const newLocalWidth =
+                        (localBox.maxX - localBox.minX) * scaleX;
+                    const newLocalHeight =
+                        (localBox.maxY - localBox.minY) * scaleY;
+                    shape.setSize(
+                        Math.max(1, newLocalWidth),
+                        Math.max(1, newLocalHeight)
+                    );
                 } else {
                     const line = shape as LineShape;
                     if (line.localEndPoint && state.startLocalEndPoint) {
-                        line.localEndPoint.x = state.startLocalEndPoint.x * scaleX;
-                        line.localEndPoint.y = state.startLocalEndPoint.y * scaleY;
+                        line.localEndPoint.x =
+                            state.startLocalEndPoint.x * scaleX;
+                        line.localEndPoint.y =
+                            state.startLocalEndPoint.y * scaleY;
                     }
                 }
             });
@@ -651,7 +731,10 @@ export function useInteractions(
 
             const firstSelectedShape = canvasStore.selectedShapes[0];
             if (firstSelectedShape) {
-                canvas.style.cursor = getCursorStyle(handle, firstSelectedShape);
+                canvas.style.cursor = getCursorStyle(
+                    handle,
+                    firstSelectedShape
+                );
             }
             return;
         }
@@ -783,7 +866,9 @@ export function useInteractions(
             const mStart = resizeStartMatrix.value;
             const startBox = resizeStartLocalBox.value;
 
-            const localMouse = new DOMPoint(point.x, point.y).matrixTransform(mInv);
+            const localMouse = new DOMPoint(point.x, point.y).matrixTransform(
+                mInv
+            );
 
             if (
                 activeShape.value.type === 'line' &&
@@ -800,7 +885,8 @@ export function useInteractions(
                             lineStartLocal.value.y
                         ).matrixTransform(mStart);
                         const newInv = activeShape.value.getInverseMatrix();
-                        const newLocalEnd = oldGlobalEnd.matrixTransform(newInv);
+                        const newLocalEnd =
+                            oldGlobalEnd.matrixTransform(newInv);
                         line.localEndPoint = {
                             x: newLocalEnd.x,
                             y: newLocalEnd.y,
@@ -816,8 +902,10 @@ export function useInteractions(
                 return;
             }
 
-            let nMinX = startBox.minX, nMaxX = startBox.maxX;
-            let nMinY = startBox.minY, nMaxY = startBox.maxY;
+            let nMinX = startBox.minX,
+                nMaxX = startBox.maxX;
+            let nMinY = startBox.minY,
+                nMaxY = startBox.maxY;
 
             let moveX = localMouse.x;
             let moveY = localMouse.y;
@@ -826,8 +914,12 @@ export function useInteractions(
                 const origW = startBox.maxX - startBox.minX;
                 const origH = startBox.maxY - startBox.minY;
 
-                const fixedX = handle.includes('l') ? startBox.maxX : startBox.minX;
-                const fixedY = handle.includes('t') ? startBox.maxY : startBox.minY;
+                const fixedX = handle.includes('l')
+                    ? startBox.maxX
+                    : startBox.minX;
+                const fixedY = handle.includes('t')
+                    ? startBox.maxY
+                    : startBox.minY;
 
                 const deltaX = localMouse.x - fixedX;
                 const deltaY = localMouse.y - fixedY;
@@ -868,11 +960,17 @@ export function useInteractions(
             const newWidth = Math.abs(nMaxX - nMinX);
             const newHeight = Math.abs(nMaxY - nMinY);
 
-            activeShape.value.setSize(Math.max(1, newWidth), Math.max(1, newHeight));
+            activeShape.value.setSize(
+                Math.max(1, newWidth),
+                Math.max(1, newHeight)
+            );
 
             const localCenterX = (nMinX + nMaxX) / 2;
             const localCenterY = (nMinY + nMaxY) / 2;
-            const newGlobalCenter = new DOMPoint(localCenterX, localCenterY).matrixTransform(mStart);
+            const newGlobalCenter = new DOMPoint(
+                localCenterX,
+                localCenterY
+            ).matrixTransform(mStart);
 
             activeShape.value.position.x = newGlobalCenter.x;
             activeShape.value.position.y = newGlobalCenter.y;
@@ -881,7 +979,9 @@ export function useInteractions(
             const startScaleY = resizeStartScale.value.y;
 
             if (handle.includes('l') || handle.includes('r')) {
-                const fixedX = handle.includes('l') ? startBox.maxX : startBox.minX;
+                const fixedX = handle.includes('l')
+                    ? startBox.maxX
+                    : startBox.minX;
                 const expectedDir = handle.includes('l') ? -1 : 1;
                 const actualDir = Math.sign(moveX - fixedX) || expectedDir;
                 const sign = actualDir === expectedDir ? 1 : -1;
@@ -889,7 +989,9 @@ export function useInteractions(
             }
 
             if (handle.includes('t') || handle.includes('b')) {
-                const fixedY = handle.includes('t') ? startBox.maxY : startBox.minY;
+                const fixedY = handle.includes('t')
+                    ? startBox.maxY
+                    : startBox.minY;
                 const expectedDir = handle.includes('t') ? -1 : 1;
                 const actualDir = Math.sign(moveY - fixedY) || expectedDir;
                 const sign = actualDir === expectedDir ? 1 : -1;
@@ -926,10 +1028,22 @@ export function useInteractions(
 
         if (canvasStore.selectedIds.length > 0 && canvasStore.selectionRect) {
             const selectionBox = {
-                minX: Math.min(canvasStore.selectionRect.start.x, canvasStore.selectionRect.end.x),
-                minY: Math.min(canvasStore.selectionRect.start.y, canvasStore.selectionRect.end.y),
-                maxX: Math.max(canvasStore.selectionRect.start.x, canvasStore.selectionRect.end.x),
-                maxY: Math.max(canvasStore.selectionRect.start.y, canvasStore.selectionRect.end.y)
+                minX: Math.min(
+                    canvasStore.selectionRect.start.x,
+                    canvasStore.selectionRect.end.x
+                ),
+                minY: Math.min(
+                    canvasStore.selectionRect.start.y,
+                    canvasStore.selectionRect.end.y
+                ),
+                maxX: Math.max(
+                    canvasStore.selectionRect.start.x,
+                    canvasStore.selectionRect.end.x
+                ),
+                maxY: Math.max(
+                    canvasStore.selectionRect.start.y,
+                    canvasStore.selectionRect.end.y
+                ),
             };
 
             const padding = SELECTION_PADDING;
@@ -939,17 +1053,24 @@ export function useInteractions(
                 minX: selectionBox.minX - padding,
                 maxX: selectionBox.maxX + padding,
                 minY: selectionBox.minY - padding,
-                maxY: selectionBox.maxY + padding
+                maxY: selectionBox.maxY + padding,
             };
 
-            const nearLeft = Math.abs(point.x - selectionBox.minX) <= edgeThreshold;
-            const nearRight = Math.abs(point.x - selectionBox.maxX) <= edgeThreshold;
-            const nearTop = Math.abs(point.y - selectionBox.minY) <= edgeThreshold;
-            const nearBottom = Math.abs(point.y - selectionBox.maxY) <= edgeThreshold;
+            const nearLeft =
+                Math.abs(point.x - selectionBox.minX) <= edgeThreshold;
+            const nearRight =
+                Math.abs(point.x - selectionBox.maxX) <= edgeThreshold;
+            const nearTop =
+                Math.abs(point.y - selectionBox.minY) <= edgeThreshold;
+            const nearBottom =
+                Math.abs(point.y - selectionBox.maxY) <= edgeThreshold;
 
-            const inY = point.y >= expandedBox.minY && point.y <= expandedBox.maxY;
-            const inX = point.x >= expandedBox.minX && point.x <= expandedBox.maxX;
-            const isInside = point.x >= expandedBox.minX &&
+            const inY =
+                point.y >= expandedBox.minY && point.y <= expandedBox.maxY;
+            const inX =
+                point.x >= expandedBox.minX && point.x <= expandedBox.maxX;
+            const isInside =
+                point.x >= expandedBox.minX &&
                 point.x <= expandedBox.maxX &&
                 point.y >= expandedBox.minY &&
                 point.y <= expandedBox.maxY;

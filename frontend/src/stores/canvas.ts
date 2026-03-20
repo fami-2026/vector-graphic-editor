@@ -551,7 +551,9 @@ export const useCanvasStore = defineStore('canvas', () => {
                 isOfflineMode: isOfflineMode.value,
                 shapes: shapes.value.map(serializeShape),
                 selectedIds: selectedIds.value,
-                selectionRect: selectionRect.value ? { ...selectionRect.value } : null,
+                selectionRect: selectionRect.value
+                    ? { ...selectionRect.value }
+                    : null,
                 zoom: zoom.value,
                 pan: pan.value,
             };
@@ -617,11 +619,14 @@ if (data.zoom) zoom.value = data.zoom;
                             (remote.content.shapes as
                                 | SerializedShape[]
                                 | undefined) ?? [],
-                        selectedId:
-                            (remote.content.selectedId as
-                                | string
-                                | null
-                                | undefined) ?? null,
+                        selectedIds:
+                            (remote.content.selectedIds as
+                                | string[]
+                                | undefined) ?? [],
+                        selectionRect: remote.content.selectionRect as
+                            | { start: Point; end: Point }
+                            | null
+                            | undefined,
                     });
                 } else {
                     await updateCanvas(
@@ -669,9 +674,12 @@ if (data.zoom) zoom.value = data.zoom;
                 shapes:
                     (remote.content.shapes as SerializedShape[] | undefined) ??
                     [],
-                selectedId:
-                    (remote.content.selectedId as string | null | undefined) ??
-                    null,
+                selectedIds:
+                    (remote.content.selectedIds as string[] | undefined) ?? [],
+                selectionRect: remote.content.selectionRect as
+                    | { start: Point; end: Point }
+                    | null
+                    | undefined,
             });
             documentId.value = remote.id;
             serverError.value = null;

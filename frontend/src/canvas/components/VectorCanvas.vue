@@ -100,8 +100,7 @@ watch(
 <template>
     <div ref="containerRef" class="canvas-wrapper">
         <canvas ref="canvasRef" class="main-canvas"></canvas>
-        <div v-if="canvasStore.hasSelection" class="selection-info">
-        </div>
+        <div v-if="canvasStore.hasSelection" class="selection-info"></div>
     </div>
 </template>
 
