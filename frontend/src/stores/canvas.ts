@@ -4,6 +4,13 @@ import type { Shape, Point } from '@/canvas/types';
 import { shapeRegistry } from '@/canvas/types';
 import { generateId } from '@/canvas/utils/math';
 import { PolygonShape } from '@/canvas/types/polygon/polygon';
+import {
+    createCanvas,
+    getCanvasById,
+    updateCanvas,
+    CanvasApiError,
+    CanvasNotFoundError,
+} from '@/api/api';
 
 interface ShapeParams extends Record<string, unknown> {
     sides?: number;
@@ -33,6 +40,16 @@ type SceneSnapshot = {
     shapes: SerializedShape[];
     selectedIds: string[];
     selectionRect?: { start: Point; end: Point } | null;
+};
+
+type CanvasStorageData = {
+    documentId: string;
+    isOfflineMode: boolean;
+    shapes: SerializedShape[];
+    selectedIds: string[];
+    selectionRect?: { start: Point; end: Point } | null;
+    zoom: number;
+    pan: { x: number; y: number };
 };
 
 type VectorEditorExport = {
@@ -130,6 +147,16 @@ export const useCanvasStore = defineStore('canvas', () => {
         } else {
             selectionRect.value = null;
         }
+    }
+
+    function snapshotToServerContent(
+        snapshot: SceneSnapshot
+    ): Record<string, unknown> {
+        return {
+            shapes: snapshot.shapes,
+            selectedIds: snapshot.selectedIds,
+            selectionRect: snapshot.selectionRect,
+        };
     }
 
     function pushHistory() {
@@ -485,7 +512,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
 
         // Какая мировая точка сейчас в центре экрана?
-        // Используем ту же математику, что и в getLocalPoint
         const zoomFactor = zoom.value / 100;
         const worldCenterX = -pan.value.x / zoomFactor;
         const worldCenterY = -pan.value.y / zoomFactor;
@@ -520,9 +546,12 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function saveToLocalStorage() {
         try {
-            const data = {
+            const data: CanvasStorageData = {
+                documentId: documentId.value,
+                isOfflineMode: isOfflineMode.value,
                 shapes: shapes.value.map(serializeShape),
                 selectedIds: selectedIds.value,
+                selectionRect: selectionRect.value ? { ...selectionRect.value } : null,
                 zoom: zoom.value,
                 pan: pan.value,
             };
@@ -540,14 +569,15 @@ export const useCanvasStore = defineStore('canvas', () => {
             const data = JSON.parse(saved) as Partial<CanvasStorageData>;
             documentId.value = String(data.documentId ?? '0');
             isOfflineMode.value = Boolean(data.isOfflineMode ?? false);
-
+if (data.zoom) zoom.value = data.zoom;
+            if (data.pan) pan.value = data.pan;
             // Добавьте загрузку цвета фона
             const savedBgColor = localStorage.getItem('canvas-bg-color');
             if (savedBgColor) {
                 backgroundColor.value = savedBgColor;
             }
 
-            const restored: Shape[] = data.shapes.map(
+            const restored: Shape[] = (data.shapes ?? []).map(
                 (plain: SerializedShape) => {
                     const { type, id, position, ...rest } = plain;
                     const shape = shapeRegistry.create(type, id, position);
@@ -558,8 +588,9 @@ export const useCanvasStore = defineStore('canvas', () => {
 
             shapes.value = restored;
             selectedIds.value = data.selectedIds || [];
-            if (data.zoom) zoom.value = data.zoom;
-            if (data.pan) pan.value = data.pan;
+            if (data.selectionRect) {
+                selectionRect.value = { ...data.selectionRect };
+            }
         } catch (e) {
             console.error('Ошибка загрузки:', e);
         }
@@ -741,11 +772,13 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     loadFromLocalStorage();
+    void initDocument();
 
     watch(
-        [shapes, selectedIds, zoom, pan],
+        [shapes, selectedIds, zoom, pan, documentId, isOfflineMode],
         () => {
             saveToLocalStorage();
+            void syncDocument();
         },
         { deep: true }
     );
@@ -764,6 +797,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         dragStartPositions,
         zoom,
         pan,
+        documentId,
+        isOfflineMode,
+        serverError,
         addShape,
         updateShape,
         deleteShape,
@@ -788,6 +824,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         zoomAtCenter,
         setPan,
         movePan,
+        openDocumentById,
         startInteraction,
         endInteraction,
         exportToJson,
