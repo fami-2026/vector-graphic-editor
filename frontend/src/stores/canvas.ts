@@ -143,7 +143,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // Конвертер для API (из множественного в одиночное)
-    function internalToApiSnapshot(internal: InternalSceneSnapshot): ApiSceneSnapshot {
+    function internalToApiSnapshot(
+        internal: InternalSceneSnapshot
+    ): ApiSceneSnapshot {
         return {
             shapes: internal.shapes,
             selectedId: internal.selectedIds[0] || null,
@@ -151,7 +153,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // Конвертер из API (из одиночного в множественное)
-    function apiToInternalSnapshot(api: ApiSceneSnapshot): InternalSceneSnapshot {
+    function apiToInternalSnapshot(
+        api: ApiSceneSnapshot
+    ): InternalSceneSnapshot {
         return {
             shapes: api.shapes,
             selectedIds: api.selectedId ? [api.selectedId] : [],
@@ -537,7 +541,9 @@ export const useCanvasStore = defineStore('canvas', () => {
                 isOfflineMode: isOfflineMode.value,
                 shapes: shapes.value.map(serializeShape),
                 selectedIds: selectedIds.value,
-                selectionRect: selectionRect.value ? { ...selectionRect.value } : null,
+                selectionRect: selectionRect.value
+                    ? { ...selectionRect.value }
+                    : null,
                 zoom: zoom.value,
                 pan: pan.value,
             };
@@ -594,21 +600,28 @@ if (data.zoom) zoom.value = data.zoom;
         //     return;
         // }
 
-    try {
-        if (documentId.value !== '0') {
-            const remote = await getCanvasById(documentId.value);
-            if (localScene.shapes.length === 0) {
-                const apiSnapshot: ApiSceneSnapshot = {
-                    shapes: (remote.content.shapes as SerializedShape[] | undefined) ?? [],
-                    selectedId: (remote.content.selectedId as string | null | undefined) ?? null,
-                };
-                restoreInternalSnapshot(apiToInternalSnapshot(apiSnapshot));
-            } else {
-                await updateCanvas(
-                    documentId.value,
-                    snapshotToServerContent(localScene)
-                );
-            }
+        try {
+            if (documentId.value !== '0') {
+                const remote = await getCanvasById(documentId.value);
+                if (localScene.shapes.length === 0) {
+                    const apiSnapshot: ApiSceneSnapshot = {
+                        shapes:
+                            (remote.content.shapes as
+                                | SerializedShape[]
+                                | undefined) ?? [],
+                        selectedId:
+                            (remote.content.selectedId as
+                                | string
+                                | null
+                                | undefined) ?? null,
+                    };
+                    restoreInternalSnapshot(apiToInternalSnapshot(apiSnapshot));
+                } else {
+                    await updateCanvas(
+                        documentId.value,
+                        snapshotToServerContent(localScene)
+                    );
+                }
 
                 isOfflineMode.value = false;
                 serverError.value = null;
@@ -616,20 +629,20 @@ if (data.zoom) zoom.value = data.zoom;
                 return;
             }
 
-        const created = await createCanvas(
-            snapshotToServerContent(localScene)
-        );
+            const created = await createCanvas(
+                snapshotToServerContent(localScene)
+            );
 
-        isOfflineMode.value = false;
-        documentId.value = created.id;
-        serverError.value = null;
-    } catch (error) {
-        isOfflineMode.value = true;
-        documentId.value = '0';
-        serverError.value =
-            error instanceof Error ? error.message : 'Сервер недоступен';
+            isOfflineMode.value = false;
+            documentId.value = created.id;
+            serverError.value = null;
+        } catch (error) {
+            isOfflineMode.value = true;
+            documentId.value = '0';
+            serverError.value =
+                error instanceof Error ? error.message : 'Сервер недоступен';
+        }
     }
-}
 
     async function openDocumentById(id: string): Promise<{
         success: boolean;
@@ -646,8 +659,12 @@ if (data.zoom) zoom.value = data.zoom;
         try {
             const remote = await getCanvasById(id);
             const apiSnapshot: ApiSceneSnapshot = {
-                shapes: (remote.content.shapes as SerializedShape[] | undefined) ?? [],
-                selectedId: (remote.content.selectedId as string | null | undefined) ?? null,
+                shapes:
+                    (remote.content.shapes as SerializedShape[] | undefined) ??
+                    [],
+                selectedId:
+                    (remote.content.selectedId as string | null | undefined) ??
+                    null,
             };
             restoreInternalSnapshot(apiToInternalSnapshot(apiSnapshot));
             documentId.value = remote.id;
@@ -762,8 +779,8 @@ if (data.zoom) zoom.value = data.zoom;
 
     return {
         shapes,
-        selectedId, 
-        selectedIds, 
+        selectedId,
+        selectedIds,
         selectedShapes,
         hasSelection,
         selectionCount,
