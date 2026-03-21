@@ -168,6 +168,7 @@ export function useInteractions(
         } else {
             pan.value.y -= e.deltaY;
         }
+
     }
 
     function hitTest(point: Point): Shape | null {
