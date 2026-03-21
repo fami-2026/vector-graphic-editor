@@ -24,22 +24,7 @@
             <button class="item" role="menuitem" type="button" @click="openExport('png')">
                 PNG
             </button>
-            <button
-                class="item"
-                role="menuitem"
-                type="button"
-                @click="exportJson"
-            >
-                JSON
-            </button>
-            <button
-                class="item"
-                role="menuitem"
-                type="button"
-                @click="exportJson"
-            >
-                JSON
-            </button>
+
             <button
                 class="item"
                 role="menuitem"
