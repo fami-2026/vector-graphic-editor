@@ -284,11 +284,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value)));
         if (newZoom === zoom.value) return;
         
-        // Сохраняем мировую точку, которая сейчас в центре экрана
         const worldCenterX = -pan.value.x / (zoom.value / 100);
         const worldCenterY = -pan.value.y / (zoom.value / 100);
         
-        // Новый pan для того же центра
         const newZoomFactor = newZoom / 100;
         const newPanX = -worldCenterX * newZoomFactor;
         const newPanY = -worldCenterY * newZoomFactor;
@@ -306,27 +304,21 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function zoomAtCenter(delta: number) {
-        // Получаем размеры канваса из переданного референса или ищем по классу
         const canvasEl = document.querySelector('.main-canvas') as HTMLCanvasElement | null;
         const rect = canvasEl?.getBoundingClientRect();
         
         if (!rect) {
-            // Если канвас не найден, просто меняем зум без коррекции pan
             zoom.value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value + delta));
             return;
         }
         
-        // Какая мировая точка сейчас в центре экрана?
-        // Используем ту же математику, что и в getLocalPoint
         const zoomFactor = zoom.value / 100;
         const worldCenterX = -pan.value.x / zoomFactor;
         const worldCenterY = -pan.value.y / zoomFactor;
         
-        // Новый зум
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value + delta));
         const newZoomFactor = newZoom / 100;
         
-        // Новый pan для того же центра
         const newPanX = -worldCenterX * newZoomFactor;
         const newPanY = -worldCenterY * newZoomFactor;
         
@@ -399,10 +391,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     async function initDocument() {
         const localScene = createSnapshot();
-
-        // if (isOfflineMode.value) {
-        //     return;
-        // }
 
         try {
             if (documentId.value !== '0') {
