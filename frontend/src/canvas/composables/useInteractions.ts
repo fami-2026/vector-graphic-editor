@@ -59,7 +59,6 @@ export function useInteractions(
     const createStart = ref<Point | null>(null);
     const createToolType = ref<ToolType | null>(null);
     const createParams = ref<Record<string, unknown> | null>(null);
-
     const multiResizeStates = ref<Map<string, ShapeResizeState>>(new Map());
     const selectionStartBox = ref<BoundingBox | null>(null);
     const dragStartPositions = ref<Map<string, Point>>(new Map());
@@ -161,39 +160,12 @@ export function useInteractions(
 
         e.preventDefault();
 
-<<<<<<< HEAD
         if (e.shiftKey) {
             pan.value.x -= e.deltaY;
         } else {
             pan.value.y -= e.deltaY;
         }
-=======
-        const rect = canvasRef.value?.getBoundingClientRect();
-        if (!rect) return;
 
-        const screenX = e.clientX - rect.left;
-        const screenY = e.clientY - rect.top;
-
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        const oldZoom = zoom.value;
-
-        const worldX = getLocalPoint(e).x;
-        const worldY = getLocalPoint(e).y;
-
-        const delta = e.deltaY > 0 ? -canvasStore.ZOOM_STEP : canvasStore.ZOOM_STEP;
-        const newZoom = Math.max(
-            canvasStore.MIN_ZOOM, 
-            Math.min(canvasStore.MAX_ZOOM, oldZoom + delta)
-        );
-        const newZoomFactor = newZoom / 100;
-        
-        const newPanX = screenX - centerX - (worldX - centerX) * newZoomFactor;
-        const newPanY = screenY - centerY - (worldY - centerY) * newZoomFactor;
-
-        zoom.value = newZoom;
-        pan.value = { x: newPanX, y: newPanY };
->>>>>>> 177a378 (delete extra lines)
     }
 
     function hitTest(point: Point): Shape | null {
