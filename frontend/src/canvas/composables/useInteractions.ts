@@ -50,15 +50,12 @@ export function useInteractions(
     const createToolType = ref<ToolType | null>(null);
     const createParams = ref<Record<string, unknown> | null>(null);
 
-    watch(
-        () => toolsStore.activeTool,
-        (newTool) => {
-            if (newTool !== 'select') {
-                canvasStore.selectShape(null);
-                activeShape.value = null;
-            }
+    watch(() => toolsStore.activeTool, (newTool) => {
+        if (newTool !== 'select') {
+            canvasStore.selectShape(null);
+            activeShape.value = null;
         }
-    );
+    });
 
     // Синхронизация выделенной фигуры из стора
     watch(
