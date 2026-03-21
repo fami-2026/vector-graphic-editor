@@ -120,45 +120,16 @@
         <section class="group">
             <h3 class="groupTitle">Фигура</h3>
 
-<<<<<<< HEAD
-            <div
-=======
-            <div 
->>>>>>> acfaf46 (add drawing)
-                class="grid2Blocks"
-                :style="{
-                    opacity: isFillDisabled ? 0.55 : 1,
-                }"
-            >
+            <div class="grid2Blocks">
                 <div class="fieldBlock">
                     <div class="fieldLabel">Цвет заливки</div>
                     <div class="grid1">
                         <div class="colorInputWrapper">
                             <div
                                 class="colorPreview"
-<<<<<<< HEAD
-                                :style="{
-                                    backgroundColor: fillColor,
-                                    opacity: isFillDisabled ? 0.35 : 1,
-                                    cursor: isFillDisabled
-                                        ? 'not-allowed'
-                                        : 'pointer',
-                                }"
-                                :class="{
-                                    disabled: !selectedShape || !isFillDisabled,
-                                }"
-                                @click="
-                                    !isFillDisabled && showColorPicker('fill')
-                                "
-=======
-                                :style="{ 
-                                    backgroundColor: fillColor,
-                                    opacity: isFillDisabled ? 0.35 : 1,
-                                    cursor: isFillDisabled ? 'not-allowed' : 'pointer',
-                                }"
-                                :class="{ disabled: !selectedShape || !isFillDisabled }"
-                                @click="!isFillDisabled && showColorPicker('fill')"
->>>>>>> acfaf46 (add drawing)
+                                :style="{ backgroundColor: fillColor }"
+                                :class="{ disabled: !selectedShape }"
+                                @click="showColorPicker('fill')"
                             />
 
                             <Teleport to="body">
@@ -191,7 +162,7 @@
                             max="1"
                             step="0.05"
                             :value="fillOpacity"
-                            :disabled="!selectedShape || isFillDisabled"
+                            :disabled="!selectedShape"
                             @input="onOpacityChange('fillOpacity', $event)"
                         />
                         <button
@@ -200,7 +171,7 @@
                             :class="{
                                 isActive: isNoColorActive('fillOpacity'),
                             }"
-                            :disabled="!selectedShape || isFillDisabled"
+                            :disabled="!selectedShape"
                             @click="setNoColor('fillOpacity')"
                         >
                             нет цвета
@@ -428,15 +399,6 @@
                                     stroke-width="2"
                                     stroke-linecap="round"
                                 />
-                                <polyline
-                                    v-else-if="shape.type === 'pencil'"
-                                    points="2,13 6,9 9,12 13,6 18,10"
-                                    fill="none"
-                                    :stroke="thumbStroke(shape)"
-                                    stroke-width="2"
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                />
                                 <!-- Все остальные полигональные фигуры -->
                                 <polygon
                                     v-else
@@ -509,11 +471,6 @@ interface ShapeWithName extends Shape {
 const editingLayerName = ref('');
 const isSaving = ref(false);
 const forceUpdate = ref(0);
-const isFillDisabled = computed(() => selectedShape.value?.type === 'pencil');
-<<<<<<< HEAD
-=======
-
->>>>>>> acfaf46 (add drawing)
 
 function getShapeDisplayName(shape: Shape) {
     const shapeWithName = shape as ShapeWithName;
@@ -608,6 +565,7 @@ onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
     document.addEventListener('click', handleClickOutside);
     document.addEventListener('mousedown', commitAfterClick, true);
+
 });
 
 onUnmounted(() => {
@@ -969,7 +927,6 @@ function shapeLabel(type: string) {
         star: 'Звезда',
         arrow: 'Стрелка',
         hexagon: 'Шестиугольник',
-        pencil: 'Карандаш',
     };
     return labels[type] ?? type;
 }
