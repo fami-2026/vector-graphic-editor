@@ -513,34 +513,16 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function setZoom(value: number) {
-<<<<<<< HEAD
-        const newZoom = Math.max(
-            MIN_ZOOM,
-            Math.min(MAX_ZOOM, Math.round(value))
-        );
-        if (newZoom === zoom.value) return;
-
-        const worldCenterX = -pan.value.x / (zoom.value / 100);
-        const worldCenterY = -pan.value.y / (zoom.value / 100);
-
-        const newZoomFactor = newZoom / 100;
-        const newPanX = -worldCenterX * newZoomFactor;
-        const newPanY = -worldCenterY * newZoomFactor;
-
-=======
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(value)));
         if (newZoom === zoom.value) return;
         
-        // Сохраняем мировую точку, которая сейчас в центре экрана
         const worldCenterX = -pan.value.x / (zoom.value / 100);
         const worldCenterY = -pan.value.y / (zoom.value / 100);
         
-        // Новый pan для того же центра
         const newZoomFactor = newZoom / 100;
         const newPanX = -worldCenterX * newZoomFactor;
         const newPanY = -worldCenterY * newZoomFactor;
         
->>>>>>> f296058 (manual scale input)
         zoom.value = newZoom;
         pan.value = { x: newPanX, y: newPanY };
     }
@@ -558,20 +540,17 @@ export const useCanvasStore = defineStore('canvas', () => {
         const rect = canvasEl?.getBoundingClientRect();
 
         if (!rect) {
-            zoom.value = Math.max(
-                MIN_ZOOM,
-                Math.min(MAX_ZOOM, zoom.value + delta)
-            );
+            zoom.value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value + delta));
             return;
         }
-
+        
         const zoomFactor = zoom.value / 100;
         const worldCenterX = -pan.value.x / zoomFactor;
         const worldCenterY = -pan.value.y / zoomFactor;
-
+        
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value + delta));
         const newZoomFactor = newZoom / 100;
-
+        
         const newPanX = -worldCenterX * newZoomFactor;
         const newPanY = -worldCenterY * newZoomFactor;
 
