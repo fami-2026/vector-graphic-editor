@@ -1,5 +1,5 @@
 import { ref, watch, type Ref } from 'vue';
-import type { Shape, Point, BoundingBox, LineShape } from '@/canvas/types';
+import type { Shape, Point, BoundingBox, LineShape, PencilShape } from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
 import { useToolsStore, type ToolType } from '@/stores/tools';
 import { SELECTION_PADDING } from '@/canvas/types';
@@ -304,6 +304,43 @@ export function useInteractions(
             return;
         }
 
+        if (toolsStore.activeTool === 'pencil') {
+            canvasStore.selectShape(null);
+            activeShape.value = null;
+
+            isCreating.value = true;
+            createStart.value = point;
+            createToolType.value = 'pencil';
+
+            if ('creationParams' in toolsStore) {
+                const store = toolsStore as {
+                    creationParams?: Record<string, unknown> | null;
+                };
+                createParams.value = store.creationParams ?? null;
+            } else {
+                createParams.value = null;
+            }
+
+            if (!hasRecordedInteraction.value) {
+                canvasStore.startInteraction();
+                hasRecordedInteraction.value = true;
+            }
+
+            const newShape = canvasStore.addShape(
+                'pencil',
+                { x: point.x, y: point.y },
+                createParams.value ?? undefined,
+                false
+            ) as PencilShape;
+
+            activeShape.value = newShape;
+
+            if (canvas) {
+                canvas.style.cursor = 'crosshair';
+            }
+            return;
+        }
+
         if (toolsStore.activeTool !== 'select') {
             canvasStore.selectShape(null);
             activeShape.value = null;
@@ -367,6 +404,26 @@ export function useInteractions(
         }
 
         if (isCreating.value && createStart.value) {
+            if (createToolType.value === 'pencil') {
+                if (!activeShape.value || activeShape.value.type !== 'pencil') {
+                    return;
+                }
+
+                const pencil = activeShape.value as PencilShape;
+                const localPoint = pencil.toVLocalPoint(point);
+                const lastPoint = pencil.points[pencil.points.length - 1];
+
+                if (
+                    !lastPoint ||
+                    Math.hypot(localPoint.x - lastPoint.x, localPoint.y - lastPoint.y) >= 1
+                ) {
+                    pencil.addPoint(point);
+                }
+
+                canvas.style.cursor = 'crosshair';
+                return;
+            }
+
             const start = createStart.value;
 
             let current = { ...point };
@@ -665,11 +722,22 @@ export function useInteractions(
 
         if (isCreating.value) {
             if (activeShape.value) {
+
+                if (activeShape.value.type === 'pencil') {
+                    const pencil = activeShape.value as PencilShape;
+                    const point = getLocalPoint(e);
+                    pencil.addPoint(point);
+                    pencil.recenterToBoundingBox();
+                }
+
                 if (hasRecordedInteraction.value) {
                     canvasStore.endInteraction();
                     hasRecordedInteraction.value = false;
                 }
-                toolsStore.setActiveTool('select');
+
+                canvasStore.selectShape(null);
+                activeShape.value = null;
+
 
                 if ('setCreationParams' in toolsStore) {
                     const store = toolsStore as {
