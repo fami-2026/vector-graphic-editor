@@ -14,6 +14,7 @@ import {
     Hexagon,
     ArrowUp,
     Pentagon,
+    Pencil,
 } from 'lucide-vue-next';
 import { useToolsStore, type ToolType } from '@/stores/tools';
 
@@ -29,6 +30,7 @@ type ToolId =
     | 'hexagon'
     | 'arrow'
     | 'eraser'
+    | 'pencil'
     | 'text';
 
 type Tool = {
@@ -49,6 +51,7 @@ const tools: Tool[] = [
     { id: 'hexagon', title: 'Шестиугольник', icon: Hexagon },
     { id: 'arrow', title: 'Стрелка', icon: ArrowUp },
     { id: 'eraser', title: 'Ластик', icon: Eraser },
+    { id: 'pencil', title: 'Карандаш', icon: Pencil },
     { id: 'text', title: 'Текст', icon: Type },
 ];
 
@@ -121,6 +124,9 @@ function handleClick(tool: Tool) {
         case 'eraser':
             toolsStore.setActiveTool('eraser');
             break;
+        case 'pencil':
+            toolsStore.setActiveTool('pencil');
+            break;
         default:
             toolsStore.setActiveTool('select');
     }
@@ -156,6 +162,7 @@ const activeId = computed<ToolId>(() => {
     if (active === 'hexagon') return 'hexagon';
     if (active === 'arrow') return 'arrow';
     if (active === 'eraser') return 'eraser';
+    if (active === 'pencil') return 'pencil';
     return 'cursor';
 });
 </script>
