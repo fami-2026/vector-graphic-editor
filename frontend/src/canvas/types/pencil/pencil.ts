@@ -161,9 +161,7 @@ export class PencilShape extends BaseShape {
 
             let t = 0;
             if (len2 > 0) {
-                t =
-                    ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) /
-                    len2;
+                t = ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) / len2;
                 t = Math.max(0, Math.min(1, t));
             }
 
@@ -183,7 +181,6 @@ export class PencilShape extends BaseShape {
     //     const xs = this.points.map((p) => p.x);
     //     const ys = this.points.map((p) => p.y);
     //     const padding = this.strokeWidth / 2 + 5;
-
     //     return {
     //         minX: Math.min(...xs) - padding,
     //         minY: Math.min(...ys) - padding,
@@ -282,3 +279,4 @@ export class PencilShape extends BaseShape {
 }
 
 shapeRegistry.register('pencil', PencilShape);
+

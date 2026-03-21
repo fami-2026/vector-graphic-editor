@@ -119,7 +119,6 @@
         <!-- Фигура -->
         <section class="group">
             <h3 class="groupTitle">Фигура</h3>
-
             <div
                 class="grid2Blocks"
                 :style="{
@@ -145,8 +144,8 @@
                                 @click="
                                     !isFillDisabled && showColorPicker('fill')
                                 "
-                            />
 
+                            >
                             <Teleport to="body">
                                 <div
                                     v-if="activePicker === 'fill'"
