@@ -668,7 +668,7 @@ function thumbFillOpacity(shape: Shape): number {
 
     const opacity = (shape as unknown as Record<string, unknown>)
         .fillOpacity as number | undefined;
-    return typeof opacity === 'number' ? Math.max(0, Math.min(1,opacity)) : 1;
+    return typeof opacity === 'number' ? Math.max(0, Math.min(1, opacity)) : 1;
 }
 
 function thumbStroke(shape: Shape): string {
