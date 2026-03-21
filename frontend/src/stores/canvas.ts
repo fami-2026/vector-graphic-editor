@@ -615,6 +615,5 @@ export const useCanvasStore = defineStore('canvas', () => {
         importFromJson,
         backgroundColor,
         setBackgroundColor,
-
     };
 });
