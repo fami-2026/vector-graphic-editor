@@ -285,11 +285,40 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function zoomIn() {
-        setZoom(zoom.value + ZOOM_STEP);
+        zoomAtCenter(ZOOM_STEP);
     }
 
     function zoomOut() {
-        setZoom(zoom.value - ZOOM_STEP);
+        zoomAtCenter(-ZOOM_STEP);
+    }
+
+    function zoomAtCenter(delta: number) {
+        // Получаем размеры канваса из переданного референса или ищем по классу
+        const canvasEl = document.querySelector('.main-canvas') as HTMLCanvasElement | null;
+        const rect = canvasEl?.getBoundingClientRect();
+        
+        if (!rect) {
+            // Если канвас не найден, просто меняем зум без коррекции pan
+            zoom.value = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value + delta));
+            return;
+        }
+        
+        // Какая мировая точка сейчас в центре экрана?
+        // Используем ту же математику, что и в getLocalPoint
+        const zoomFactor = zoom.value / 100;
+        const worldCenterX = -pan.value.x / zoomFactor;
+        const worldCenterY = -pan.value.y / zoomFactor;
+        
+        // Новый зум
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value + delta));
+        const newZoomFactor = newZoom / 100;
+        
+        // Новый pan для того же центра
+        const newPanX = -worldCenterX * newZoomFactor;
+        const newPanY = -worldCenterY * newZoomFactor;
+        
+        zoom.value = newZoom;
+        pan.value = { x: newPanX, y: newPanY };
     }
 
     function setPan(value: { x: number; y: number }) {
@@ -557,6 +586,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         setZoom,
         zoomIn,
         zoomOut,
+        zoomAtCenter,
         pan,
         setPan,
         movePan,
