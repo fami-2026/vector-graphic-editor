@@ -21,13 +21,16 @@
         </button>
 
         <div v-if="open" class="menu" role="menu">
+            <button class="item" role="menuitem" type="button" @click="openExport('png')">
+                PNG
+            </button>
             <button
                 class="item"
                 role="menuitem"
                 type="button"
-                @click="openExport('png')"
+                @click="exportJson"
             >
-                PNG
+                JSON
             </button>
             <button
                 class="item"
@@ -104,6 +107,7 @@ import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useCanvasStore } from '@/stores/canvas';
 import {
+    buildDefaultFileName,
     exportScene,
     sanitizeFileName,
     type ExportArea,
@@ -142,6 +146,10 @@ function close() {
 
 function openExport(format: ExportFormat) {
     form.format = format;
+    form.fileName = buildDefaultFileName(format, 'vector-export').replace(
+        /\.[^.]$/,
+        ''
+    );
     normalizeFileName();
     showExport.value = true;
     close();
