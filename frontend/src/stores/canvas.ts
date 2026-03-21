@@ -539,9 +539,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function zoomAtCenter(delta: number) {
-        const canvasEl = document.querySelector(
-            '.main-canvas'
-        ) as HTMLCanvasElement | null;
+        const canvasEl = document.querySelector('.main-canvas') as HTMLCanvasElement | null;
         const rect = canvasEl?.getBoundingClientRect();
 
         if (!rect) {
@@ -556,10 +554,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const worldCenterX = -pan.value.x / zoomFactor;
         const worldCenterY = -pan.value.y / zoomFactor;
 
-        const newZoom = Math.max(
-            MIN_ZOOM,
-            Math.min(MAX_ZOOM, zoom.value + delta)
-        );
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom.value + delta));
         const newZoomFactor = newZoom / 100;
 
         const newPanX = -worldCenterX * newZoomFactor;
