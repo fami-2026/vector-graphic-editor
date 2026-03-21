@@ -549,6 +549,7 @@ function handleClickOutside(event: MouseEvent) {
 onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
     document.addEventListener('click', handleClickOutside);
+
 });
 
 onUnmounted(() => {
