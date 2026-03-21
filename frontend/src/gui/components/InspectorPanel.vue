@@ -120,7 +120,11 @@
         <section class="group">
             <h3 class="groupTitle">Фигура</h3>
 
+<<<<<<< HEAD
             <div
+=======
+            <div 
+>>>>>>> acfaf46 (add drawing)
                 class="grid2Blocks"
                 :style="{
                     opacity: isFillDisabled ? 0.55 : 1,
@@ -132,6 +136,7 @@
                         <div class="colorInputWrapper">
                             <div
                                 class="colorPreview"
+<<<<<<< HEAD
                                 :style="{
                                     backgroundColor: fillColor,
                                     opacity: isFillDisabled ? 0.35 : 1,
@@ -145,6 +150,15 @@
                                 @click="
                                     !isFillDisabled && showColorPicker('fill')
                                 "
+=======
+                                :style="{ 
+                                    backgroundColor: fillColor,
+                                    opacity: isFillDisabled ? 0.35 : 1,
+                                    cursor: isFillDisabled ? 'not-allowed' : 'pointer',
+                                }"
+                                :class="{ disabled: !selectedShape || !isFillDisabled }"
+                                @click="!isFillDisabled && showColorPicker('fill')"
+>>>>>>> acfaf46 (add drawing)
                             />
 
                             <Teleport to="body">
@@ -496,6 +510,10 @@ const editingLayerName = ref('');
 const isSaving = ref(false);
 const forceUpdate = ref(0);
 const isFillDisabled = computed(() => selectedShape.value?.type === 'pencil');
+<<<<<<< HEAD
+=======
+
+>>>>>>> acfaf46 (add drawing)
 
 function getShapeDisplayName(shape: Shape) {
     const shapeWithName = shape as ShapeWithName;

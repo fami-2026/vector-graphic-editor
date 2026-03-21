@@ -1,11 +1,5 @@
 import { ref, watch, type Ref } from 'vue';
-import type {
-    Shape,
-    Point,
-    BoundingBox,
-    LineShape,
-    PencilShape,
-} from '@/canvas/types';
+import type { Shape, Point, BoundingBox, LineShape, PencilShape } from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
 import { useToolsStore, type ToolType } from '@/stores/tools';
 import { SELECTION_PADDING } from '@/canvas/types';
@@ -798,10 +792,7 @@ export function useInteractions(
 
                 if (
                     !lastPoint ||
-                    Math.hypot(
-                        localPoint.x - lastPoint.x,
-                        localPoint.y - lastPoint.y
-                    ) >= 1
+                    Math.hypot(localPoint.x - lastPoint.x, localPoint.y - lastPoint.y) >= 1
                 ) {
                     pencil.addPoint(point);
                 }
