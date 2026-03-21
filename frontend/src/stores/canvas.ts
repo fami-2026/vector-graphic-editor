@@ -835,5 +835,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         endInteraction,
         exportToJson,
         importFromJson,
+        MIN_ZOOM,
+        MAX_ZOOM,
+        ZOOM_STEP,
     };
 });
