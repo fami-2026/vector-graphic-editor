@@ -21,13 +21,16 @@
         </button>
 
         <div v-if="open" class="menu" role="menu">
+            <button class="item" role="menuitem" type="button" @click="openExport('png')">
+                PNG
+            </button>
             <button
                 class="item"
                 role="menuitem"
                 type="button"
-                @click="openExport('png')"
+                @click="exportJson"
             >
-                PNG
+                JSON
             </button>
             <button
                 class="item"
@@ -104,6 +107,7 @@ import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useCanvasStore } from '@/stores/canvas';
 import {
+    buildDefaultFileName,
     exportScene,
     sanitizeFileName,
     type ExportArea,
@@ -142,6 +146,10 @@ function close() {
 
 function openExport(format: ExportFormat) {
     form.format = format;
+    form.fileName = buildDefaultFileName(format, 'vector-export').replace(
+        /\.[^.]$/,
+        ''
+    );
     normalizeFileName();
     showExport.value = true;
     close();
@@ -168,6 +176,22 @@ function getSceneSize() {
 
 function normalizeFileName() {
     form.fileName = sanitizeFileName(form.fileName);
+}
+
+function exportJson() {
+    const json = canvasStore.exportToJson();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `vector-editor-${timestamp}.json`;
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    close();
 }
 
 async function submitExport() {
