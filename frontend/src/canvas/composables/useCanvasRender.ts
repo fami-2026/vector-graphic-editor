@@ -1,6 +1,7 @@
 import type { Ref } from 'vue';
 import type { Shape, LineShape } from '@/canvas/types';
 import { SELECTION_PADDING } from '@/canvas/types';
+import { useCanvasStore } from '@/stores/canvas';
 
 /**
  * Composable для отрисовки фигур на канвасе.
@@ -117,7 +118,12 @@ export function useCanvasRender(
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
 
+        const canvasStore = useCanvasStore();
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = canvasStore.backgroundColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
         const zoomFactor = zoom.value / 100;
         ctx.save();
         ctx.translate(
@@ -141,6 +147,7 @@ export function useCanvasRender(
                 drawSelectionBox(ctx, selectedShape);
             }
         }
+        
         ctx.restore();
     }
 
