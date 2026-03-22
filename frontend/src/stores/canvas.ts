@@ -71,6 +71,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const documentId = ref<string>('0');
     const isOfflineMode = ref(false);
     const serverError = ref<string | null>(null);
+    const backgroundColor = ref<string>('#ffffff');
 
     let isContinuousChangeActive = false;
     let continuousChangeTimer: number | null = null;
@@ -326,6 +327,12 @@ export const useCanvasStore = defineStore('canvas', () => {
             const data = JSON.parse(saved) as Partial<CanvasStorageData>;
             documentId.value = String(data.documentId ?? '0');
             isOfflineMode.value = Boolean(data.isOfflineMode ?? false);
+            
+            // Добавьте загрузку цвета фона
+            const savedBgColor = localStorage.getItem('canvas-bg-color');
+            if (savedBgColor) {
+                backgroundColor.value = savedBgColor;
+            }
 
             const restored: Shape[] = (data.shapes ?? []).map(
                 (plain: SerializedShape) => {
@@ -341,6 +348,11 @@ export const useCanvasStore = defineStore('canvas', () => {
         } catch (e) {
             console.error('Ошибка загрузки:', e);
         }
+    }
+
+    function setBackgroundColor(color: string) {
+        backgroundColor.value = color;
+        localStorage.setItem('canvas-bg-color', color);
     }
 
     async function initDocument() {
@@ -556,5 +568,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         endInteraction,
         exportToJson,
         importFromJson,
+        backgroundColor,
+        setBackgroundColor,
     };
 });
