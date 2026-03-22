@@ -72,7 +72,9 @@ export async function exportScene(options: ExportOptions): Promise<void> {
     if (!target) {
         throw new Error('Нет фигур для экспорта.');
     }
-    
+
+    validateShapeBounds(options.shapes);
+
     const fileName = ensureExtension(options.fileName, options.format);
 
     if (options.format === 'svg') {
@@ -376,6 +378,7 @@ function getShapeDisplayName(shape: Shape): string {
 
 function validateShapeBounds(shapes: Shape[]): void {
     const MAX_LAYER_DIMENSION = 16384;
+
     const MAX_LAYER_AREA = 100_000_000;
 
     for (const shape of shapes) {
@@ -385,6 +388,7 @@ function validateShapeBounds(shapes: Shape[]): void {
         const height = Math.max(box.maxY - box.minY);
         const area = width * height;
 
+
         const hasInvalidNumbers =
             !Number.isFinite(box.minX) ||
             !Number.isFinite(box.minY) ||
@@ -393,6 +397,7 @@ function validateShapeBounds(shapes: Shape[]): void {
             !Number.isFinite(width) ||
             !Number.isFinite(height) ||
             !Number.isFinite(area);
+            !Number.isFinite(height);
 
         if (hasInvalidNumbers) {
             throw new Error(
@@ -404,6 +409,7 @@ function validateShapeBounds(shapes: Shape[]): void {
             width > MAX_LAYER_DIMENSION ||
             height > MAX_LAYER_DIMENSION ||
             area > MAX_LAYER_AREA
+
         ) {
             throw new Error(
                 `Слой "${getShapeDisplayName(shape)}" слишком большой для экспорта PNG. Уменьшите его размер.`
