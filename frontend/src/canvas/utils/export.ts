@@ -75,6 +75,10 @@ export async function exportScene(options: ExportOptions): Promise<void> {
 
     validateShapeBounds(options.shapes);
 
+<<<<<<< HEAD
+=======
+    const totalBounds = getTotalBounds(options.shapes);
+>>>>>>> 00c5803 (fix: print png export errors for oversized layers)
     const fileName = ensureExtension(options.fileName, options.format);
 
     if (options.format === 'svg') {
@@ -412,3 +416,4 @@ function validateShapeBounds(shapes: Shape[]): void {
         }
     }
 }
+
