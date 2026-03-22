@@ -5,10 +5,11 @@ import { useCanvasStore } from '@/stores/canvas';
 import { useCanvasRender } from '@/canvas/composables/useCanvasRender';
 import { useInteractions } from '@/canvas/composables/useInteractions';
 
+const canvasStore = useCanvasStore();
+const { shapes, selectedId, zoom, pan, backgroundColor } = storeToRefs(canvasStore);
+
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
-
-const { shapes, selectedId, zoom, pan } = storeToRefs(useCanvasStore());
 
 const { draw } = useCanvasRender(canvasRef, shapes, selectedId, zoom, pan);
 const { attachListeners } = useInteractions(canvasRef, shapes, zoom, pan);
@@ -45,9 +46,11 @@ onUnmounted(() => {
     detachListeners?.();
 });
 
-watch([shapes, selectedId, zoom, pan], () => requestAnimationFrame(draw), {
-    deep: true,
-});
+watch(
+    [shapes, selectedId, zoom, pan, backgroundColor],
+    () => requestAnimationFrame(draw),
+    { deep: true }
+);
 </script>
 
 <template>
