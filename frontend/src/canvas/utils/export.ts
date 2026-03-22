@@ -1,9 +1,9 @@
-import type { Shape } from '@/canvas/types';
+import type { Shape, Point } from '@/canvas/types';
 
-export type ExportFormat = 'png';
+export type ExportFormat = 'png' | 'svg';
 export type ExportArea = 'scene';
 export type PngScale = 1 | 2 | 3;
-export type PngBackground = 'transparent' | 'white';
+export type ExportBackground = 'transparent' | 'white';
 
 export interface ExportSceneSize {
     width: number;
@@ -18,7 +18,7 @@ export interface ExportOptions {
     selectedId: string | null;
     sceneSize: ExportSceneSize;
     pngScale?: PngScale;
-    pngBackground?: PngBackground;
+    background?: ExportBackground;
 }
 
 interface ExportBounds {
@@ -75,7 +75,11 @@ export async function exportScene(options: ExportOptions): Promise<void> {
 
     const fileName = ensureExtension(options.fileName, options.format);
 
-    await exportPng(target, fileName, options);
+    if (options.format === 'svg') {
+        await exportSvg(target, fileName, options);
+    } else {
+        await exportPng(target, fileName, options);
+    }
 }
 
 function resolveExportTarget(options: ExportOptions): ExportTarget | null {
@@ -96,7 +100,7 @@ async function exportPng(
     options: ExportOptions
 ): Promise<void> {
     const scale = options.pngScale ?? 1;
-    const background = options.pngBackground ?? 'transparent';
+    const background = options.background ?? 'transparent';
 
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(target.bounds.width * scale));
@@ -126,6 +130,157 @@ async function exportPng(
 
     const blob = await canvasToBlob(canvas, 'image/png');
     triggerDownload(blob, fileName);
+}
+
+async function exportSvg(
+    target: ExportTarget,
+    fileName: string,
+    options: ExportOptions
+): Promise<void> {
+    const background = options.background ?? 'transparent';
+    const { width, height } = target.bounds;
+
+    const svgParts: string[] = [
+        `<?xml version="1.0" encoding="UTF-8"?>`,
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+    ];
+
+    if (background === 'white') {
+        svgParts.push(
+            `  <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"/>`
+        );
+    }
+
+    svgParts.push(`  <g transform="translate(${-target.bounds.x}, ${-target.bounds.y})">`);
+
+    for (const shape of target.shapes) {
+        const svgElement = shapeToSvgElement(shape);
+        if (svgElement) {
+            svgParts.push(`    ${svgElement}`);
+        }
+    }
+
+    svgParts.push(`  </g>`);
+    svgParts.push(`</svg>`);
+
+    const svgContent = svgParts.join('\n');
+    const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+    triggerDownload(blob, fileName);
+}
+
+function shapeToSvgElement(shape: Shape): string | null {
+    const transform = buildSvgTransform(shape);
+    const style = buildSvgStyle(shape);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = shape as any;
+
+    switch (shape.type) {
+        case 'rect': {
+            const w = Math.abs(s.width * shape.scaleX);
+            const h = Math.abs(s.height * shape.scaleY);
+            const x = -w / 2;
+            const y = -h / 2;
+            return `<rect x="${x}" y="${y}" width="${w}" height="${h}"${transform}${style}/>`;
+        }
+        case 'circle': {
+            const rx = Math.abs(s.radiusX * shape.scaleX);
+            const ry = Math.abs(s.radiusY * shape.scaleY);
+            return `<ellipse cx="0" cy="0" rx="${rx}" ry="${ry}"${transform}${style}/>`;
+        }
+        case 'triangle': {
+            const halfW = s.width / 2;
+            const halfH = s.height / 2;
+            const points = [
+                { x: 0, y: -halfH },
+                { x: -halfW, y: halfH },
+                { x: halfW, y: halfH },
+            ];
+            const pointsStr = points.map((p) => `${p.x},${p.y}`).join(' ');
+            return `<polygon points="${pointsStr}"${transform}${style}/>`;
+        }
+        case 'polygon': {
+            const points = s.getLocalPoints();
+            if (!points) return null;
+            const pointsStr = points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+            return `<polygon points="${pointsStr}"${transform}${style}/>`;
+        }
+        case 'line': {
+            if (!s.localEndPoint) return null;
+            const x2 = s.localEndPoint.x * shape.scaleX;
+            const y2 = s.localEndPoint.y * shape.scaleY;
+            return `<line x1="0" y1="0" x2="${x2}" y2="${y2}"${transform}${style}/>`;
+        }
+        case 'arrow': {
+            if (!s.getLocalArrowPoints) return null;
+            const points = s.getLocalArrowPoints();
+            if (!points || points.length === 0) return null;
+            const pointsStr = points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+            return `<polygon points="${pointsStr}"${transform}${style}/>`;
+        }
+        case 'star': {
+            if (!s.getLocalPoints) return null;
+            const points = s.getLocalPoints();
+            if (!points || points.length === 0) return null;
+            const pointsStr = points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+            return `<polygon points="${pointsStr}"${transform}${style}/>`;
+        }
+        case 'hexagon': {
+            if (!s.getLocalPoints) return null;
+            const points = s.getLocalPoints();
+            if (!points || points.length === 0) return null;
+            const pointsStr = points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+            return `<polygon points="${pointsStr}"${transform}${style}/>`;
+        }
+        default:
+            return null;
+    }
+}
+
+function buildSvgTransform(shape: Shape): string {
+    const transforms: string[] = [];
+    const { x, y } = shape.position;
+    const { rotation } = shape;
+
+    if (x !== 0 || y !== 0) {
+        transforms.push(`translate(${x}, ${y})`);
+    }
+    if (rotation !== 0) {
+        transforms.push(`rotate(${rotation})`);
+    }
+    if (shape.scaleX !== 1 || shape.scaleY !== 1) {
+        transforms.push(`scale(${shape.scaleX}, ${shape.scaleY})`);
+    }
+
+    return transforms.length > 0 ? ` transform="${transforms.join(' ')}"` : '';
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildSvgStyle(shape: any): string {
+    const attrs: string[] = [];
+
+    const fillOpacity = shape.fillOpacity ?? 1;
+    const strokeOpacity = shape.strokeOpacity ?? 1;
+
+    if (fillOpacity === 0) {
+        attrs.push(`fill="none"`);
+    } else if (shape.fill) {
+        attrs.push(`fill="${shape.fill}"`);
+        if (fillOpacity !== 1) {
+            attrs.push(`fill-opacity="${fillOpacity}"`);
+        }
+    }
+
+    if (shape.stroke) {
+        attrs.push(`stroke="${shape.stroke}"`);
+        if (strokeOpacity !== 1) {
+            attrs.push(`stroke-opacity="${strokeOpacity}"`);
+        }
+    }
+    if (shape.strokeWidth !== undefined && shape.strokeWidth > 0) {
+        attrs.push(`stroke-width="${shape.strokeWidth}"`);
+    }
+
+    return attrs.length > 0 ? ' ' + attrs.join(' ') : '';
 }
 
 function ensureExtension(fileName: string, format: ExportFormat): string {
