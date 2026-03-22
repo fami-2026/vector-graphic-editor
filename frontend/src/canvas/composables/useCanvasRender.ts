@@ -123,7 +123,7 @@ export function useCanvasRender(
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = canvasStore.backgroundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         const zoomFactor = zoom.value / 100;
         ctx.save();
         ctx.translate(
@@ -147,7 +147,7 @@ export function useCanvasRender(
                 drawSelectionBox(ctx, selectedShape);
             }
         }
-        
+
         ctx.restore();
     }
 

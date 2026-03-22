@@ -327,7 +327,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             const data = JSON.parse(saved) as Partial<CanvasStorageData>;
             documentId.value = String(data.documentId ?? '0');
             isOfflineMode.value = Boolean(data.isOfflineMode ?? false);
-            
+
             // Добавьте загрузку цвета фона
             const savedBgColor = localStorage.getItem('canvas-bg-color');
             if (savedBgColor) {

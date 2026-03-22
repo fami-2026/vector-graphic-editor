@@ -260,7 +260,7 @@
         <!-- Фон холста -->
         <section class="group">
             <h3 class="groupTitle">Фон холста</h3>
-            
+
             <div class="grid2Blocks">
                 <div class="fieldBlock">
                     <div class="fieldLabel">Цвет фона</div>
@@ -268,10 +268,12 @@
                         <div class="colorInputWrapper">
                             <div
                                 class="colorPreview"
-                                :style="{ backgroundColor: canvasBackgroundColor }"
+                                :style="{
+                                    backgroundColor: canvasBackgroundColor,
+                                }"
                                 @click="showCanvasColorPicker"
                             />
-                            
+
                             <Teleport to="body">
                                 <div
                                     v-if="activeCanvasPicker"
@@ -290,7 +292,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="fieldBlock buttonBlock">
                     <button
                         class="smallToggleBtn"
@@ -533,12 +535,12 @@ function handleClickOutside(event: MouseEvent) {
             activePicker.value = null;
         }
     }
-    
+
     if (activeCanvasPicker.value) {
         const target = event.target as HTMLElement;
         const isClickOnPreview = target.classList.contains('colorPreview');
         const isClickInPicker = target.closest('.floatingColorPicker');
-        
+
         if (!isClickInPicker && !isClickOnPreview) {
             activeCanvasPicker.value = false;
         }
@@ -979,19 +981,19 @@ const canvasBackgroundColor = computed(() => {
 // Функция показа пикера для фона холста
 function showCanvasColorPicker() {
     const previewElement = event?.currentTarget as HTMLElement;
-    
+
     if (previewElement) {
         const rect = previewElement.getBoundingClientRect();
-        
+
         pickerPosition.value = {
             position: 'absolute',
             top: rect.bottom + window.scrollY - 35 + 'px',
             left: rect.left + window.scrollX - 250 + 'px',
             zIndex: 9999,
         };
-        
+
         activeCanvasPicker.value = true;
-        
+
         nextTick(() => {
             if (canvasColorInputRef.value) {
                 canvasColorInputRef.value.focus();
@@ -1005,7 +1007,7 @@ function showCanvasColorPicker() {
 function onCanvasColorChange(event: Event) {
     const target = event.target as HTMLInputElement;
     const value = target.value;
-    
+
     canvasStore.setBackgroundColor(value);
 }
 
@@ -1013,8 +1015,6 @@ function onCanvasColorChange(event: Event) {
 function resetCanvasBackground() {
     canvasStore.setBackgroundColor('#ffffff');
 }
-
-
 </script>
 
 <style scoped>
@@ -1449,5 +1449,4 @@ function resetCanvasBackground() {
 .buttonBlock {
     margin-top: 22px;
 }
-
 </style>
