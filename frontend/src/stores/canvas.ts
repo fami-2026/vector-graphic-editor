@@ -525,15 +525,15 @@ export const useCanvasStore = defineStore('canvas', () => {
         const newId = generateId();
 
         const duplicate = shapeRegistry.create(type, newId, {
-             x: position.x + 20, y: position.y + 20 
+             x: position.x + 5, y: position.y + 5 
         });
 
         Object.assign(duplicate, rest);
 
         duplicate.id = newId;
         duplicate.position = {
-            x: duplicate.position.x + 20,
-            y: duplicate.position.y + 20,
+            x: duplicate.position.x + 5,
+            y: duplicate.position.y + 5,
         };
         
         const sourceName = (source as Shape & { name?: string }).name;
