@@ -15,8 +15,11 @@ import {
     ArrowUp,
     Pentagon,
     Pencil,
+    CopyPlus,
 } from 'lucide-vue-next';
 import { useToolsStore, type ToolType } from '@/stores/tools';
+import { useCanvasStore } from '@/stores/canvas';
+import { storeToRefs } from 'pinia';
 
 type ToolId =
     | 'hand'
@@ -56,6 +59,13 @@ const tools: Tool[] = [
 ];
 
 const toolsStore = useToolsStore();
+
+const canvasStore = useCanvasStore();
+const { selectedShape } = storeToRefs(canvasStore);
+const canDuplicate = computed(() => {
+    return toolsStore.activeTool === 'select' && !!selectedShape.value;
+});
+
 
 // Состояние для диалога многоугольника
 const showPolygonDialog = ref(false);
@@ -150,6 +160,11 @@ function createPolygon() {
     polygonSides.value = 5;
 }
 
+function handleDuplicate() {
+    if (!canDuplicate.value) return;
+    canvasStore.duplicateSelectedShape();
+}
+
 const activeId = computed<ToolId>(() => {
     const active: ToolType = toolsStore.activeTool;
     if (active === 'hand') return 'hand';
@@ -184,6 +199,16 @@ const activeId = computed<ToolId>(() => {
                 :size="18"
                 aria-hidden="true"
             />
+        </button>
+        <button
+                class="toolBtn"
+                :class="{ active: false }"
+                type="button"
+                title="Дублирование"
+                :disabled="!canDuplicate"
+                @click="handleDuplicate"
+            >
+                <CopyPlus class="lucideIcon" :size="18" aria-hidden="true" />
         </button>
 
         <Teleport to="body">
