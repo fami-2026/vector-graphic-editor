@@ -310,6 +310,15 @@ const activeId = computed<ToolId>(() => {
     background: #f3f4f6;
 }
 
+.toolBtn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.toolBtn:disabled:hover {
+    background: transparent;
+}
+
 .toolBtn.active {
     background: rgba(37, 99, 235, 0.15);
     border-color: rgba(37, 99, 235, 0.35);
