@@ -308,7 +308,7 @@ function canvasToBlob(
     return new Promise((resolve, reject) => {
         canvas.toBlob((blob) => {
             if (!blob) {
-                reject(new Error('Не удалось сформировать файл экспорта.'));
+                reject(new Error('Не удалось сформировать файл экспорта. Попробуйте уменьшить размер объектов или выбрать меньший масштаб экспорта.'));
                 return;
             }
             resolve(blob);
@@ -354,12 +354,14 @@ function getShapeDisplayName(shape: Shape): string {
 
 function validateShapeBounds(shapes: Shape[]): void {
     const MAX_LAYER_DIMENSION = 16384;
+    const MAX_LAYER_AREA = 100_000_000;
 
     for (const shape of shapes) {
         const box = shape.getBoundingBox();
 
-        const width = box.maxX - box.minX;
-        const height = box.maxY - box.minY;
+        const width = Math.abs(box.maxX - box.minX);
+        const height = Math.max(box.maxY - box.minY);
+        const area = width * height;
 
         const hasInvalidNumbers =
             !Number.isFinite(box.minX) ||
@@ -367,7 +369,8 @@ function validateShapeBounds(shapes: Shape[]): void {
             !Number.isFinite(box.maxX) ||
             !Number.isFinite(box.maxY) ||
             !Number.isFinite(width) ||
-            !Number.isFinite(height);
+            !Number.isFinite(height) ||
+            !Number.isFinite(area);
 
         if (hasInvalidNumbers) {
             throw new Error(
@@ -376,8 +379,9 @@ function validateShapeBounds(shapes: Shape[]): void {
         }
 
         if (
-            Math.abs(width) > MAX_LAYER_DIMENSION ||
-            Math.abs(height) > MAX_LAYER_DIMENSION
+            width > MAX_LAYER_DIMENSION ||
+            height > MAX_LAYER_DIMENSION ||
+            area > MAX_LAYER_AREA
         ) {
             throw new Error(
                 `Слой "${getShapeDisplayName(shape)}" слишком большой для экспорта PNG. Уменьшите его размер.`
