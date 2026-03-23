@@ -32,8 +32,10 @@ import BottomToolbar from './BottomToolbar.vue';
 import BottomLeftControls from './BottomLeftControls.vue';
 import VectorCanvas from '@/canvas/components/VectorCanvas.vue';
 import { useCanvasStore } from '@/stores/canvas';
+import { useToolsStore } from '@/stores/tools';
 
 const canvasStore = useCanvasStore();
+const toolsStore = useToolsStore();
 
 function isEditableElement(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -52,6 +54,52 @@ function handleKeydown(e: KeyboardEvent) {
     const isCtrl = e.ctrlKey || e.metaKey;
 
     if (!isCtrl) {
+        if (!isEditableElement(e.target)) {
+        switch (e.code) {
+            case 'Digit1':
+                e.preventDefault();
+                toolsStore.setActiveTool('select');
+                break;
+            case 'Digit2':
+                e.preventDefault();
+                toolsStore.setActiveTool('line');
+                break;
+            case 'Digit3':
+                e.preventDefault();
+                toolsStore.setActiveTool('rect');
+                break;
+            case 'Digit4':
+                e.preventDefault();
+                toolsStore.setActiveTool('circle');
+                break;
+            case 'Digit5':
+                e.preventDefault();
+                toolsStore.setActiveTool('triangle');
+                break;
+            case 'Digit6':
+                e.preventDefault();
+                toolsStore.setActiveTool('polygon');
+                break;
+            case 'Digit7':
+                e.preventDefault();
+                toolsStore.setActiveTool('star');
+                break;
+            case 'Digit8':
+                e.preventDefault();
+                toolsStore.setActiveTool('hexagon');
+                break;
+            case 'Digit9':
+                e.preventDefault();
+                toolsStore.setActiveTool('arrow');
+                break;
+            case 'Digit0':
+                e.preventDefault();
+                toolsStore.setActiveTool('eraser');
+                break;
+        }
+    }
+
+
         if (e.code === 'Equal' || e.code === 'NumpadAdd') {
             e.preventDefault();
             canvasStore.zoomIn();
