@@ -746,10 +746,21 @@ function isNoColorActive(key: OpacityFieldKey) {
 
 function setNoColor(key: OpacityFieldKey) {
     if (!selectedShape.value) return;
+    const currentOpacity =
+        key === 'fillOpacity' ? fillOpacity.value : strokeOpacity.value;
+    const isCurrentlyNoColor =
+        typeof currentOpacity === 'number' &&
+        normalizeOpacity(currentOpacity) === 0;
 
-    canvasStore.updateShape(selectedShape.value.id, {
-        [key]: 0,
-    } as Partial<Shape>);
+    if (isCurrentlyNoColor) {
+        canvasStore.updateShape(selectedShape.value.id, {
+            [key]: 1,
+        } as Partial<Shape>);
+    } else {
+        canvasStore.updateShape(selectedShape.value.id, {
+            [key]: 0,
+        } as Partial<Shape>);
+    }
 }
 
 function shapeLabel(type: string) {
