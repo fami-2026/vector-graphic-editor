@@ -151,7 +151,9 @@ async function exportSvg(
         );
     }
 
-    svgParts.push(`  <g transform="translate(${-target.bounds.x}, ${-target.bounds.y})">`);
+    svgParts.push(
+        `  <g transform="translate(${-target.bounds.x}, ${-target.bounds.y})">`
+    );
 
     for (const shape of target.shapes) {
         const svgElement = shapeToSvgElement(shape);
@@ -164,7 +166,9 @@ async function exportSvg(
     svgParts.push(`</svg>`);
 
     const svgContent = svgParts.join('\n');
-    const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+    const blob = new Blob([svgContent], {
+        type: 'image/svg+xml;charset=utf-8',
+    });
     triggerDownload(blob, fileName);
 }
 
@@ -201,7 +205,9 @@ function shapeToSvgElement(shape: Shape): string | null {
         case 'polygon': {
             const points = s.getLocalPoints();
             if (!points) return null;
-            const pointsStr = points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+            const pointsStr = points
+                .map((p: Point) => `${p.x},${p.y}`)
+                .join(' ');
             return `<polygon points="${pointsStr}"${transform}${style}/>`;
         }
         case 'line': {
@@ -214,21 +220,27 @@ function shapeToSvgElement(shape: Shape): string | null {
             if (!s.getLocalArrowPoints) return null;
             const points = s.getLocalArrowPoints();
             if (!points || points.length === 0) return null;
-            const pointsStr = points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+            const pointsStr = points
+                .map((p: Point) => `${p.x},${p.y}`)
+                .join(' ');
             return `<polygon points="${pointsStr}"${transform}${style}/>`;
         }
         case 'star': {
             if (!s.getLocalPoints) return null;
             const points = s.getLocalPoints();
             if (!points || points.length === 0) return null;
-            const pointsStr = points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+            const pointsStr = points
+                .map((p: Point) => `${p.x},${p.y}`)
+                .join(' ');
             return `<polygon points="${pointsStr}"${transform}${style}/>`;
         }
         case 'hexagon': {
             if (!s.getLocalPoints) return null;
             const points = s.getLocalPoints();
             if (!points || points.length === 0) return null;
-            const pointsStr = points.map((p: Point) => `${p.x},${p.y}`).join(' ');
+            const pointsStr = points
+                .map((p: Point) => `${p.x},${p.y}`)
+                .join(' ');
             return `<polygon points="${pointsStr}"${transform}${style}/>`;
         }
         default:
