@@ -55,50 +55,49 @@ function handleKeydown(e: KeyboardEvent) {
 
     if (!isCtrl) {
         if (!isEditableElement(e.target)) {
-        switch (e.code) {
-            case 'Digit1':
-                e.preventDefault();
-                toolsStore.setActiveTool('select');
-                break;
-            case 'Digit2':
-                e.preventDefault();
-                toolsStore.setActiveTool('line');
-                break;
-            case 'Digit3':
-                e.preventDefault();
-                toolsStore.setActiveTool('rect');
-                break;
-            case 'Digit4':
-                e.preventDefault();
-                toolsStore.setActiveTool('circle');
-                break;
-            case 'Digit5':
-                e.preventDefault();
-                toolsStore.setActiveTool('triangle');
-                break;
-            case 'Digit6':
-                e.preventDefault();
-                toolsStore.setActiveTool('polygon');
-                break;
-            case 'Digit7':
-                e.preventDefault();
-                toolsStore.setActiveTool('star');
-                break;
-            case 'Digit8':
-                e.preventDefault();
-                toolsStore.setActiveTool('hexagon');
-                break;
-            case 'Digit9':
-                e.preventDefault();
-                toolsStore.setActiveTool('arrow');
-                break;
-            case 'Digit0':
-                e.preventDefault();
-                toolsStore.setActiveTool('eraser');
-                break;
+            switch (e.code) {
+                case 'Digit1':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('select');
+                    break;
+                case 'Digit2':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('line');
+                    break;
+                case 'Digit3':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('rect');
+                    break;
+                case 'Digit4':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('circle');
+                    break;
+                case 'Digit5':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('triangle');
+                    break;
+                case 'Digit6':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('polygon');
+                    break;
+                case 'Digit7':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('star');
+                    break;
+                case 'Digit8':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('hexagon');
+                    break;
+                case 'Digit9':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('arrow');
+                    break;
+                case 'Digit0':
+                    e.preventDefault();
+                    toolsStore.setActiveTool('eraser');
+                    break;
+            }
         }
-    }
-
 
         if (e.code === 'Equal' || e.code === 'NumpadAdd') {
             e.preventDefault();
