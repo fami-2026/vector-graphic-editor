@@ -308,7 +308,11 @@ function canvasToBlob(
     return new Promise((resolve, reject) => {
         canvas.toBlob((blob) => {
             if (!blob) {
-                reject(new Error('Не удалось сформировать файл экспорта. Попробуйте уменьшить размер объектов или выбрать меньший масштаб экспорта.'));
+                reject(
+                    new Error(
+                        'Не удалось сформировать файл экспорта. Попробуйте уменьшить размер объектов или выбрать меньший масштаб экспорта.'
+                    )
+                );
                 return;
             }
             resolve(blob);
@@ -330,16 +334,16 @@ function getTotalBounds(shapes: Shape[]): ExportBounds {
         return { x: 0, y: 0, width: 1, height: 1 };
     }
 
-    const bounds = shapes.map(shape => shape.getBoundingBox());
-    
-    const minX = Math.min(...bounds.map(b => b.minX));
-    const minY = Math.min(...bounds.map(b => b.minY));
-    const maxX = Math.max(...bounds.map(b => b.maxX));
-    const maxY = Math.max(...bounds.map(b => b.maxY));
-    
+    const bounds = shapes.map((shape) => shape.getBoundingBox());
+
+    const minX = Math.min(...bounds.map((b) => b.minX));
+    const minY = Math.min(...bounds.map((b) => b.minY));
+    const maxX = Math.max(...bounds.map((b) => b.maxX));
+    const maxY = Math.max(...bounds.map((b) => b.maxY));
+
     const width = Math.max(1, maxX - minX);
     const height = Math.max(1, maxY - minY);
-    
+
     return { x: minX, y: minY, width, height };
 }
 

@@ -66,7 +66,6 @@ const canDuplicate = computed(() => {
     return toolsStore.activeTool === 'select' && !!selectedShape.value;
 });
 
-
 // Состояние для диалога многоугольника
 const showPolygonDialog = ref(false);
 const polygonSides = ref(5);
@@ -201,14 +200,14 @@ const activeId = computed<ToolId>(() => {
             />
         </button>
         <button
-                class="toolBtn"
-                :class="{ active: false }"
-                type="button"
-                title="Дублирование"
-                :disabled="!canDuplicate"
-                @click="handleDuplicate"
-            >
-                <CopyPlus class="lucideIcon" :size="18" aria-hidden="true" />
+            class="toolBtn"
+            :class="{ active: false }"
+            type="button"
+            title="Дублирование"
+            :disabled="!canDuplicate"
+            @click="handleDuplicate"
+        >
+            <CopyPlus class="lucideIcon" :size="18" aria-hidden="true" />
         </button>
 
         <Teleport to="body">

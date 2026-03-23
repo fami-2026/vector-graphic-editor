@@ -495,7 +495,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
         const sourceName = (source as Shape & { name?: string }).name;
         if (sourceName && sourceName.trim()) {
-            (duplicate as Shape & { name?: string }).name = `${sourceName} копия`;
+            (duplicate as Shape & { name?: string }).name =
+                `${sourceName} копия`;
         }
 
         shapes.value.push(duplicate as Shape);
