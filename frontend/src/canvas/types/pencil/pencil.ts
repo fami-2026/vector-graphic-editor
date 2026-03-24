@@ -161,7 +161,9 @@ export class PencilShape extends BaseShape {
 
             let t = 0;
             if (len2 > 0) {
-                t = ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) / len2;
+                t =
+                    ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) /
+                    len2;
                 t = Math.max(0, Math.min(1, t));
             }
 
@@ -279,4 +281,3 @@ export class PencilShape extends BaseShape {
 }
 
 shapeRegistry.register('pencil', PencilShape);
-

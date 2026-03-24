@@ -21,7 +21,7 @@ type PencilDefaults = {
     stroke: string;
     strokeOpacity: number;
     strokeWidth: number;
-}
+};
 
 /**
  * Хранилище состояния активного инструмента редактора.
@@ -55,5 +55,12 @@ export const useToolsStore = defineStore('tools', () => {
         };
     }
 
-    return { activeTool, setActiveTool, creationParams, setCreationParams, pencilDefaults, setPencilDefaults };
+    return {
+        activeTool,
+        setActiveTool,
+        creationParams,
+        setCreationParams,
+        pencilDefaults,
+        setPencilDefaults,
+    };
 });

@@ -142,7 +142,9 @@
                                 :class="{
                                     disabled: !selectedShape || isFillDisabled,
                                 }"
-                                @click="!isFillDisabled && showColorPicker('fill')"
+                                @click="
+                                    !isFillDisabled && showColorPicker('fill')
+                                "
                             />
                             <Teleport to="body">
                                 <div
@@ -207,7 +209,10 @@
                             <div
                                 class="colorPreview"
                                 :style="{ backgroundColor: strokeColor }"
-                                :class="{ disabled: !selectedShape && !isPencilToolMode }"
+                                :class="{
+                                    disabled:
+                                        !selectedShape && !isPencilToolMode,
+                                }"
                                 @click="showColorPicker('stroke')"
                             />
 
@@ -519,7 +524,10 @@ const fillColorInputRef = ref<HTMLInputElement | null>(null);
 const strokeColorInputRef = ref<HTMLInputElement | null>(null);
 
 function showColorPicker(type: 'fill' | 'stroke') {
-    if (!selectedShape.value && !(isPencilToolMode.value && type === 'stroke')) {
+    if (
+        !selectedShape.value &&
+        !(isPencilToolMode.value && type === 'stroke')
+    ) {
         return;
     }
 
@@ -656,7 +664,6 @@ const strokeWidth = computed(() => {
 
 const layers = computed(() => [...shapes.value].reverse());
 
-
 function layerIndexToShapeIndex(layerIndex: number) {
     return shapes.value.length - 1 - layerIndex;
 }
@@ -791,7 +798,7 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
         });
         return;
     }
-    
+
     if (!selectedShape.value) return;
 
     const step = wheelStepConfig[key];
@@ -1051,7 +1058,6 @@ function setNoColor(key: OpacityFieldKey) {
         [key]: nextValue,
     } as Partial<Shape>);
 }
-
 
 function shapeLabel(type: string) {
     const labels: Record<string, string> = {

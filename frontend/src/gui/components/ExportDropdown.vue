@@ -21,7 +21,12 @@
         </button>
 
         <div v-if="open" class="menu" role="menu">
-            <button class="item" role="menuitem" type="button" @click="openExport('png')">
+            <button
+                class="item"
+                role="menuitem"
+                type="button"
+                @click="openExport('png')"
+            >
                 PNG
             </button>
             <button

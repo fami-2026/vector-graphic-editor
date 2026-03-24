@@ -179,7 +179,7 @@ function cancelEditing() {
     font-size: 12px;
     font-weight: 600;
     color: #374151;
-    border: 1px solid #2196F3;
+    border: 1px solid #2196f3;
     border-radius: 4px;
     padding: 2px 4px;
     outline: none;

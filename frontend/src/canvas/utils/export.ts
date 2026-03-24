@@ -74,7 +74,7 @@ export async function exportScene(options: ExportOptions): Promise<void> {
     }
 
     validateShapeBounds(options.shapes);
-    
+
     const fileName = ensureExtension(options.fileName, options.format);
 
     if (options.format === 'svg') {
@@ -412,4 +412,3 @@ function validateShapeBounds(shapes: Shape[]): void {
         }
     }
 }
-
