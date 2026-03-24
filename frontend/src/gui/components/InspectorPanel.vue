@@ -44,7 +44,9 @@
                             :disabled="!selectedShape"
                             min="1"
                             @blur="onNumberChange('width', $event)"
-                            @keydown.enter.prevent="onNumberEnter('width', $event)"
+                            @keydown.enter.prevent="
+                                onNumberEnter('width', $event)
+                            "
                             @wheel.prevent="onWheelChange('width', $event)"
                         />
                         <input
@@ -55,7 +57,9 @@
                             :disabled="!selectedShape"
                             min="1"
                             @blur="onNumberChange('height', $event)"
-                            @keydown.enter.prevent="onNumberEnter('height', $event)"
+                            @keydown.enter.prevent="
+                                onNumberEnter('height', $event)
+                            "
                             @wheel.prevent="onWheelChange('height', $event)"
                         />
                     </div>
@@ -100,7 +104,9 @@
                         min="0"
                         max="360"
                         @blur="onNumberChange('rotation', $event)"
-                        @keydown.enter.prevent="onNumberEnter('rotation', $event)"
+                        @keydown.enter.prevent="
+                            onNumberEnter('rotation', $event)
+                        "
                         @wheel.prevent="onWheelChange('rotation', $event)"
                     />
                     <div class="spacer" aria-hidden="true" />
@@ -269,7 +275,9 @@
                         max="5"
                         step="0.5"
                         @blur="onNumberChange('strokeWidth', $event)"
-                        @keydown.enter.prevent="onNumberEnter('strokeWidth', $event)"
+                        @keydown.enter.prevent="
+                            onNumberEnter('strokeWidth', $event)
+                        "
                         @wheel.prevent="onWheelChange('strokeWidth', $event)"
                     />
                     <div class="spacer" aria-hidden="true" />
@@ -581,13 +589,13 @@ function handleClickOutside(event: MouseEvent) {
 onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
     document.addEventListener('click', handleClickOutside);
-    document.addEventListener('mousedown',commitAfterClick,true);
+    document.addEventListener('mousedown', commitAfterClick, true);
 });
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
     document.removeEventListener('click', handleClickOutside);
-    document.removeEventListener('mousedown',commitAfterClick,true);
+    document.removeEventListener('mousedown', commitAfterClick, true);
 });
 
 const canvasStore = useCanvasStore();
@@ -693,7 +701,8 @@ function applyNumberValue(key: NumberFieldKey, target: HTMLInputElement) {
         return;
     }
 
-    const normalized = Math.round(normalizeNumberByKey(key, parsed) * 100) / 100;
+    const normalized =
+        Math.round(normalizeNumberByKey(key, parsed) * 100) / 100;
     target.value = String(normalized);
     const currentValue = getCurrentNumberValue(key);
 
