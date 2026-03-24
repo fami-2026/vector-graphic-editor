@@ -73,6 +73,8 @@ export async function exportScene(options: ExportOptions): Promise<void> {
         throw new Error('Нет фигур для экспорта.');
     }
 
+    validateShapeBounds(options.shapes);
+
     const fileName = ensureExtension(options.fileName, options.format);
 
     if (options.format === 'svg') {
@@ -339,4 +341,47 @@ function getTotalBounds(shapes: Shape[]): ExportBounds {
     const height = Math.max(1, maxY - minY);
 
     return { x: minX, y: minY, width, height };
+}
+
+function getShapeDisplayName(shape: Shape): string {
+    const shapeWithName = shape as Shape & { name?: string };
+    if (shapeWithName.name && shapeWithName.name.trim()) {
+        return shapeWithName.name;
+    }
+
+    return shape.type;
+}
+
+function validateShapeBounds(shapes: Shape[]): void {
+    const MAX_LAYER_DIMENSION = 16384;
+
+    for (const shape of shapes) {
+        const box = shape.getBoundingBox();
+
+        const width = box.maxX - box.minX;
+        const height = box.maxY - box.minY;
+
+        const hasInvalidNumbers =
+            !Number.isFinite(box.minX) ||
+            !Number.isFinite(box.minY) ||
+            !Number.isFinite(box.maxX) ||
+            !Number.isFinite(box.maxY) ||
+            !Number.isFinite(width) ||
+            !Number.isFinite(height);
+
+        if (hasInvalidNumbers) {
+            throw new Error(
+                `Слой "${getShapeDisplayName(shape)}" не может быть экспортирован в PNG. Попробуйте изменить его размер.`
+            );
+        }
+
+        if (
+            Math.abs(width) > MAX_LAYER_DIMENSION ||
+            Math.abs(height) > MAX_LAYER_DIMENSION
+        ) {
+            throw new Error(
+                `Слой "${getShapeDisplayName(shape)}" слишком большой для экспорта PNG. Уменьшите его размер.`
+            );
+        }
+    }
 }

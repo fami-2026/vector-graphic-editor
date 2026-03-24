@@ -12,7 +12,8 @@ export type ToolType =
     | 'star'
     | 'hexagon'
     | 'arrow'
-    | 'eraser';
+    | 'eraser'
+    | 'pencil';
 
 type CreationParams = Record<string, unknown> | null;
 
