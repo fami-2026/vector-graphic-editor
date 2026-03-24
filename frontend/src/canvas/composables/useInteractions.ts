@@ -50,6 +50,16 @@ export function useInteractions(
     const createToolType = ref<ToolType | null>(null);
     const createParams = ref<Record<string, unknown> | null>(null);
 
+    watch(
+        () => toolsStore.activeTool,
+        (newTool) => {
+            if (newTool !== 'select') {
+                canvasStore.selectShape(null);
+                activeShape.value = null;
+            }
+        }
+    );
+
     // Синхронизация выделенной фигуры из стора
     watch(
         [() => canvasStore.selectedId, shapes],
@@ -660,6 +670,7 @@ export function useInteractions(
                     hasRecordedInteraction.value = false;
                 }
                 toolsStore.setActiveTool('select');
+
                 if ('setCreationParams' in toolsStore) {
                     const store = toolsStore as {
                         setCreationParams?: (

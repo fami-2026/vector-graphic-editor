@@ -85,12 +85,11 @@ export async function exportScene(options: ExportOptions): Promise<void> {
 function resolveExportTarget(options: ExportOptions): ExportTarget | null {
     if (options.shapes.length === 0) return null;
 
-    const width = Math.max(1, Math.round(options.sceneSize.width));
-    const height = Math.max(1, Math.round(options.sceneSize.height));
+    const bounds = getTotalBounds(options.shapes);
 
     return {
         shapes: options.shapes,
-        bounds: { x: 0, y: 0, width, height },
+        bounds: bounds,
     };
 }
 
@@ -322,4 +321,22 @@ function triggerDownload(blob: Blob, fileName: string): void {
     link.download = fileName;
     link.click();
     URL.revokeObjectURL(url);
+}
+
+function getTotalBounds(shapes: Shape[]): ExportBounds {
+    if (shapes.length === 0) {
+        return { x: 0, y: 0, width: 1, height: 1 };
+    }
+
+    const bounds = shapes.map((shape) => shape.getBoundingBox());
+
+    const minX = Math.min(...bounds.map((b) => b.minX));
+    const minY = Math.min(...bounds.map((b) => b.minY));
+    const maxX = Math.max(...bounds.map((b) => b.maxX));
+    const maxY = Math.max(...bounds.map((b) => b.maxY));
+
+    const width = Math.max(1, maxX - minX);
+    const height = Math.max(1, maxY - minY);
+
+    return { x: minX, y: minY, width, height };
 }
