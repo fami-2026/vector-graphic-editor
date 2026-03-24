@@ -858,10 +858,7 @@ export function useInteractions(
                 const localPoint = pencil.toVLocalPoint(point);
                 const lastPoint = pencil.points[pencil.points.length - 1];
 
-                if (
-                    !lastPoint ||
-                    Math.hypot(localPoint.x - lastPoint.x, localPoint.y - lastPoint.y) >= 1
-                ) {
+                if (!lastPoint || Math.hypot(localPoint.x - lastPoint.x, localPoint.y - lastPoint.y) >= 1) {
                     pencil.addPoint(point);
                 }
 
