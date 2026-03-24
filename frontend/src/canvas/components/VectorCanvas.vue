@@ -27,7 +27,7 @@ const { draw } = useCanvasRender(
     zoom,
     pan,
 );
-
+ 
 let resizeObserver: ResizeObserver | null = null;
 let detachListeners: (() => void) | undefined;
 
