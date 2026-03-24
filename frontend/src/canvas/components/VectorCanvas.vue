@@ -90,6 +90,7 @@ watch(
         selectedId,
         zoom,
         pan,
+        backgroundColor,
         () => canvasStore.selectedIds,
         () => canvasStore.isSelecting,
         () => canvasStore.selectionBox.start,
