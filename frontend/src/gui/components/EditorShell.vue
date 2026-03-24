@@ -5,19 +5,30 @@
                 <VectorCanvas />
             </div>
 
-            <div class="topLeft">
+            <div v-show="!isFocusMode" class="topLeft">
                 <TopLeftActions />
             </div>
 
-            <div class="rightPanel">
-                <InspectorPanel />
+            <div v-show="!isFocusMode" class="rightPanelWrap" :class="{ closed: !isInspectorOpen }">
+                <button
+                    class="toggleInspectorBtn"
+                    type="button"
+                    :title="isInspectorOpen ? 'Скрыть панель' : 'Показать панель'"
+                    @click="isInspectorOpen = !isInspectorOpen"
+                >
+                    {{ isInspectorOpen ? '›' : '‹' }}
+                </button>
+
+                <div class="rightPanel">
+                    <InspectorPanel />
+                </div>
             </div>
 
-            <div class="bottomCenter">
+            <div v-show="!isFocusMode" class="bottomCenter">
                 <BottomToolbar />
             </div>
 
-            <div class="bottomLeft">
+            <div v-show="!isFocusMode" class="bottomLeft">
                 <BottomLeftControls />
             </div>
         </div>
@@ -25,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import TopLeftActions from './TopLeftActions.vue';
 import InspectorPanel from './InspectorPanel.vue';
 import BottomToolbar from './BottomToolbar.vue';
@@ -36,6 +47,8 @@ import { useToolsStore } from '@/stores/tools';
 
 const canvasStore = useCanvasStore();
 const toolsStore = useToolsStore();
+const isInspectorOpen = ref(true);
+const isFocusMode = ref(false);
 
 function isEditableElement(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -49,6 +62,12 @@ function isEditableElement(target: EventTarget | null): boolean {
 }
 
 function handleKeydown(e: KeyboardEvent) {
+    if (e.code === 'Space' && e.shiftKey) {
+        e.preventDefault();
+        isFocusMode.value = !isFocusMode.value;
+        return;
+    }
+
     if (isEditableElement(e.target)) return;
 
     const isCtrl = e.ctrlKey || e.metaKey;
@@ -157,13 +176,6 @@ onUnmounted(() => {
     left: 14px;
 }
 
-.rightPanel {
-    position: absolute;
-    top: 50%;
-    right: 18px;
-    transform: translateY(-50%);
-}
-
 .bottomCenter {
     position: absolute;
     left: 50%;
@@ -175,5 +187,53 @@ onUnmounted(() => {
     position: absolute;
     left: 14px;
     bottom: 14px;
+}
+
+.rightPanelWrap {
+    position: absolute;
+    top: 50%;
+    right: 18px;
+    transform: translateY(-50%);
+    transition: transform 0.25s ease;
+}
+
+.rightPanelWrap.closed {
+    transform: translateY(-50%) translateX(248px);
+}
+
+.rightPanel {
+    position: relative;
+}
+
+.toggleInspectorBtn {
+    position: absolute;
+    left: -28px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    width: 28px;
+    height: 56px;
+
+    border: 1px solid #e5e7eb;
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+
+    background: #ffffff;
+    color: #6b7280;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    z-index: 2;
+}
+
+.toggleInspectorBtn:hover {
+    background: #f9fafb;
+    color: #111827;
 }
 </style>
