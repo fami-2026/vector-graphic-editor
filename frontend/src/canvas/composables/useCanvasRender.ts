@@ -1,5 +1,5 @@
 import type { Ref } from 'vue';
-import type { Shape, LineShape, Point } from '@/canvas/types';
+import type { Shape, LineShape } from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
 import { SELECTION_PADDING } from '@/canvas/types';
 

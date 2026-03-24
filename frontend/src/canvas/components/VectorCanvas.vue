@@ -11,22 +11,21 @@ const { shapes, selectedId, zoom, pan, backgroundColor } = storeToRefs(canvasSto
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-// Получаем интеракции
-const { attachListeners, updateTransform, isSelecting, selectionStart, selectionEnd } = useInteractions(
+// Получаем интеракции - убираем неиспользуемые переменные
+const { attachListeners, updateTransform } = useInteractions(
     canvasRef, 
     shapes, 
     zoom, 
     pan
 );
 
-// Передаем правильное количество аргументов (5-6)
 const { draw } = useCanvasRender(
     canvasRef,
     shapes,
     selectedId,
     zoom,
     pan,
-    updateTransform  // это 6-й аргумент
+    updateTransform
 );
 
 let resizeObserver: ResizeObserver | null = null;
