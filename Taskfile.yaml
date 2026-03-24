@@ -25,4 +25,5 @@ tasks:
       ORIGIN: '{{.ORIGIN | default "localhost:5000"}}'
     cmds:
       - docker network create vge || true
+      - docker compose pull
       - docker compose up -d
