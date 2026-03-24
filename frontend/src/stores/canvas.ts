@@ -187,7 +187,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function pushHistory() {
-        const snapshot = createInternalSnapshot();
+        const snapshot = createSnapshot();
         undoStack.value.push(snapshot);
         if (undoStack.value.length > HISTORY_LIMIT) {
             undoStack.value.shift();
@@ -228,7 +228,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const snapshot = undoStack.value.pop();
         if (!snapshot) return;
 
-        const current = createInternalSnapshot();
+        const current = createSnapshot();
         redoStack.value.push(current);
         restoreInternalSnapshot(snapshot);
     }
@@ -237,7 +237,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const snapshot = redoStack.value.pop();
         if (!snapshot) return;
 
-        const current = createInternalSnapshot();
+        const current = createSnapshot();
         undoStack.value.push(current);
         restoreInternalSnapshot(snapshot);
     }
@@ -594,7 +594,7 @@ if (data.zoom) zoom.value = data.zoom;
     }
 
     async function initDocument() {
-        const localScene = createInternalSnapshot();
+        const localScene = createSnapshot();
 
         try {
             if (documentId.value !== '0') {
@@ -696,7 +696,7 @@ if (data.zoom) zoom.value = data.zoom;
         try {
             await updateCanvas(
                 documentId.value,
-                snapshotToServerContent(createInternalSnapshot())
+                snapshotToServerContent(createSnapshot())
             );
             serverError.value = null;
         } catch (error) {
@@ -712,7 +712,7 @@ if (data.zoom) zoom.value = data.zoom;
             format: 'vector-editor',
             version: 1,
             exportedAt: new Date().toISOString(),
-            scene: createInternalSnapshot(),
+            scene: createSnapshot(),
         };
 
         return JSON.stringify(payload, null, 2);
