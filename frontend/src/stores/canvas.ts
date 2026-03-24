@@ -46,11 +46,16 @@ type CanvasStorageData = {
     isOfflineMode: boolean;
     shapes: SerializedShape[];
     selectedId: string | null;
+<<<<<<< HEAD
     selectedIds?: string[];
     selectionRect?: { start: Point; end: Point } | null;
     zoom?: number;
     pan?: { x: number; y: number };
     backgroundColor?: string;
+=======
+    zoom: number;
+    pan: { x: number; y: number };
+>>>>>>> 493d492 (Исправлено восстановление положения холста к положению по умолчанию при обновлении страницы)
 };
 
 type VectorEditorExport = {
@@ -637,7 +642,7 @@ export const useCanvasStore = defineStore('canvas', () => {
                     ? { ...selectionRect.value }
                     : null,
                 zoom: zoom.value,
-                pan: pan.value,
+                pan: { ...pan.value },
                 backgroundColor: backgroundColor.value,
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -654,10 +659,25 @@ export const useCanvasStore = defineStore('canvas', () => {
             const data = JSON.parse(saved) as Partial<CanvasStorageData>;
             documentId.value = String(data.documentId ?? '0');
             isOfflineMode.value = Boolean(data.isOfflineMode ?? false);
-            if (data.zoom) zoom.value = data.zoom;
-            if (data.pan) pan.value = data.pan;
-            if (data.backgroundColor)
+            zoom.value = Math.max(
+                MIN_ZOOM,
+                Math.min(MAX_ZOOM, Number(data.zoom ?? 100))
+            );
+            
+            const savedPan = data.pan;
+            pan.value = {
+                x: Number(savedPan?.x ?? 0),
+                y: Number(savedPan?.y ?? 0),
+            };
+            
+            if (data.backgroundColor) {
                 backgroundColor.value = data.backgroundColor;
+            } else {
+                const savedBgColor = localStorage.getItem('canvas-bg-color');
+                if (savedBgColor) {
+                    backgroundColor.value = savedBgColor;
+                }
+            }
 
             const restored: Shape[] = (data.shapes ?? []).map(
                 (plain: SerializedShape) => {
@@ -856,7 +876,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     void initDocument();
 
     watch(
+<<<<<<< HEAD
         [shapes, selectedId, documentId, isOfflineMode, backgroundColor],
+=======
+        [shapes, selectedId, documentId, isOfflineMode, zoom, pan],
+>>>>>>> 493d492 (Исправлено восстановление положения холста к положению по умолчанию при обновлении страницы)
         () => {
             saveToLocalStorage();
             void syncDocument();
