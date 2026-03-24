@@ -103,6 +103,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const documentId = ref<string>('0');
     const isOfflineMode = ref(false);
     const serverError = ref<string | null>(null);
+    const backgroundColor = ref<string>('#ffffff');
 
     let isContinuousChangeActive = false;
     let continuousChangeTimer: number | null = null;
@@ -531,6 +532,11 @@ export const useCanvasStore = defineStore('canvas', () => {
         };
     }
 
+    function setBackgroundColor(color: string) {
+        backgroundColor.value = color;
+        localStorage.setItem('canvas-bg-color', color);
+    }
+
     const STORAGE_KEY = 'vector-editor-canvas';
 
     function saveToLocalStorage() {
@@ -563,6 +569,12 @@ export const useCanvasStore = defineStore('canvas', () => {
             if (data.zoom) zoom.value = data.zoom;
             if (data.pan) pan.value = data.pan;
 
+            // Добавьте загрузку цвета фона
+            const savedBgColor = localStorage.getItem('canvas-bg-color');
+            if (savedBgColor) {
+                backgroundColor.value = savedBgColor;
+            }
+
             const restored: Shape[] = (data.shapes ?? []).map(
                 (plain: SerializedShape) => {
                     const { type, id, position, ...rest } = plain;
@@ -581,6 +593,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             console.error('Ошибка загрузки:', e);
         }
     }
+
     async function initDocument() {
         const localScene = createInternalSnapshot();
 
@@ -777,6 +790,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         documentId,
         isOfflineMode,
         serverError,
+        backgroundColor,
         addShape,
         updateShape,
         deleteShape,
@@ -805,6 +819,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         endInteraction,
         exportToJson,
         importFromJson,
+        setBackgroundColor,
         MIN_ZOOM,
         MAX_ZOOM,
         ZOOM_STEP,

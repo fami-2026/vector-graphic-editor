@@ -1,5 +1,5 @@
 import type { Ref } from 'vue';
-import type { Shape, LineShape } from '@/canvas/types';
+import type { Shape, LineShape, Point } from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
 import { SELECTION_PADDING } from '@/canvas/types';
 
@@ -110,6 +110,7 @@ export function useCanvasRender(
         const canvas = canvasRef.value;
         if (!canvas) return;
 
+        // Рисуем активную рамку выделения (резиновую)
         if (
             canvasStore.isSelecting &&
             canvasStore.selectionBox.start &&
@@ -134,25 +135,9 @@ export function useCanvasRender(
             ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
 
             ctx.setLineDash([]);
-            ctx.fillStyle = '#ffffff';
-            ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = 1.5;
-
-            const handles: Array<[number, number]> = [
-                [rect.x, rect.y],
-                [rect.x + rect.width, rect.y],
-                [rect.x + rect.width, rect.y + rect.height],
-                [rect.x, rect.y + rect.height],
-            ];
-
-            handles.forEach(([x, y]) => {
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-            });
         }
 
+        // Рисуем рамку выделения для группы фигур (постоянная)
         if (
             canvasStore.selectionRect &&
             !canvasStore.isSelecting &&
@@ -212,6 +197,9 @@ export function useCanvasRender(
         if (!canvas || !ctx) return;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = canvasStore.backgroundColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         const zoomFactor = zoom.value / 100;
 
         ctx.save();
@@ -223,18 +211,21 @@ export function useCanvasRender(
         ctx.scale(zoomFactor, zoomFactor);
         ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
+        // Рисуем все фигуры
         for (const shape of shapes.value) {
             ctx.save();
             shape.render(ctx);
             ctx.restore();
         }
 
+        // Рисуем рамки выделения для выделенных фигур
         for (const shape of shapes.value) {
             if (canvasStore.selectedIds.includes(shape.id)) {
                 drawSelectionBox(ctx, shape);
             }
         }
 
+        // Рисуем резиновую рамку выделения
         drawSelectionRect(ctx);
 
         ctx.restore();

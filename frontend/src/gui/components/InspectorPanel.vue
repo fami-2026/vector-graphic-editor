@@ -257,6 +257,55 @@
 
         <div class="divider" />
 
+        <!-- Фон холста -->
+        <section class="group">
+            <h3 class="groupTitle">Фон холста</h3>
+
+            <div class="grid2Blocks">
+                <div class="fieldBlock">
+                    <div class="fieldLabel">Цвет фона</div>
+                    <div class="grid1">
+                        <div class="colorInputWrapper">
+                            <div
+                                class="colorPreview"
+                                :style="{
+                                    backgroundColor: canvasBackgroundColor,
+                                }"
+                                @click="showCanvasColorPicker"
+                            />
+
+                            <Teleport to="body">
+                                <div
+                                    v-if="activeCanvasPicker"
+                                    class="floatingColorPicker"
+                                    :style="pickerPosition"
+                                >
+                                    <input
+                                        ref="canvasColorInputRef"
+                                        type="color"
+                                        :value="canvasBackgroundColor"
+                                        @input="onCanvasColorChange"
+                                        @blur="activeCanvasPicker = false"
+                                    />
+                                </div>
+                            </Teleport>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="fieldBlock buttonBlock">
+                    <button
+                        class="smallToggleBtn"
+                        @click="resetCanvasBackground"
+                    >
+                        Нет цвета
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <div class="divider" />
+
         <!-- Слои -->
         <section class="group">
             <div class="layersHeader">
@@ -477,24 +526,34 @@ function onLayerNameEnter(shapeId: string) {
 }
 
 function handleClickOutside(event: MouseEvent) {
-    if (!activePicker.value) return;
+    if (activePicker.value) {
+        const target = event.target as HTMLElement;
+        const isClickOnPreview = target.classList.contains('colorPreview');
+        const isClickInPicker = target.closest('.floatingColorPicker');
 
-    const target = event.target as HTMLElement;
-    const isClickOnPreview = target.classList.contains('colorPreview');
-    const isClickInPicker = target.closest('.floatingColorPicker');
+        if (!isClickInPicker && !isClickOnPreview) {
+            activePicker.value = null;
+        }
+    }
 
-    if (!isClickInPicker && !isClickOnPreview) {
-        activePicker.value = null;
+    if (activeCanvasPicker.value) {
+        const target = event.target as HTMLElement;
+        const isClickOnPreview = target.classList.contains('colorPreview');
+        const isClickInPicker = target.closest('.floatingColorPicker');
+
+        if (!isClickInPicker && !isClickOnPreview) {
+            activeCanvasPicker.value = false;
+        }
     }
 }
 onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('click', handleClickOutside); // Добавьте эту строку
+    document.addEventListener('click', handleClickOutside);
 });
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
-    document.removeEventListener('click', handleClickOutside); // Добавьте эту строку
+    document.removeEventListener('click', handleClickOutside);
 });
 
 const canvasStore = useCanvasStore();
@@ -656,7 +715,7 @@ function thumbFill(shape: Shape): string {
     const fill = (shape as unknown as Record<string, unknown>).fill as
         | string
         | undefined;
-    if (!fill || fill === 'transparent') return '#e5e7eb';
+    if (!fill || fill === 'transparent') return 'transparent';
     return fill;
 }
 
@@ -664,10 +723,11 @@ function thumbFillOpacity(shape: Shape): number {
     const fill = (shape as unknown as Record<string, unknown>).fill as
         | string
         | undefined;
-    if (!fill || fill === 'transparent') return 0.4;
+    if (!fill || fill === 'transparent') return 0;
+
     const opacity = (shape as unknown as Record<string, unknown>)
         .fillOpacity as number | undefined;
-    return typeof opacity === 'number' ? Math.max(0.15, opacity) : 1;
+    return typeof opacity === 'number' ? Math.max(0, Math.min(1, opacity)) : 1;
 }
 
 function thumbStroke(shape: Shape): string {
@@ -746,10 +806,21 @@ function isNoColorActive(key: OpacityFieldKey) {
 
 function setNoColor(key: OpacityFieldKey) {
     if (!selectedShape.value) return;
+    const currentOpacity =
+        key === 'fillOpacity' ? fillOpacity.value : strokeOpacity.value;
+    const isCurrentlyNoColor =
+        typeof currentOpacity === 'number' &&
+        normalizeOpacity(currentOpacity) === 0;
 
-    canvasStore.updateShape(selectedShape.value.id, {
-        [key]: 0,
-    } as Partial<Shape>);
+    if (isCurrentlyNoColor) {
+        canvasStore.updateShape(selectedShape.value.id, {
+            [key]: 1,
+        } as Partial<Shape>);
+    } else {
+        canvasStore.updateShape(selectedShape.value.id, {
+            [key]: 0,
+        } as Partial<Shape>);
+    }
 }
 
 function shapeLabel(type: string) {
@@ -900,6 +971,50 @@ onMounted(() => {
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
 });
+
+const activeCanvasPicker = ref(false);
+const canvasColorInputRef = ref<HTMLInputElement | null>(null);
+const canvasBackgroundColor = computed(() => {
+    return canvasStore.backgroundColor || '#ffffff';
+});
+
+// Функция показа пикера для фона холста
+function showCanvasColorPicker() {
+    const previewElement = event?.currentTarget as HTMLElement;
+
+    if (previewElement) {
+        const rect = previewElement.getBoundingClientRect();
+
+        pickerPosition.value = {
+            position: 'absolute',
+            top: rect.bottom + window.scrollY - 35 + 'px',
+            left: rect.left + window.scrollX - 250 + 'px',
+            zIndex: 9999,
+        };
+
+        activeCanvasPicker.value = true;
+
+        nextTick(() => {
+            if (canvasColorInputRef.value) {
+                canvasColorInputRef.value.focus();
+                canvasColorInputRef.value.click();
+            }
+        });
+    }
+}
+
+// Функция изменения цвета фона холста
+function onCanvasColorChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const value = target.value;
+
+    canvasStore.setBackgroundColor(value);
+}
+
+// Функция сброса цвета фона
+function resetCanvasBackground() {
+    canvasStore.setBackgroundColor('#ffffff');
+}
 </script>
 
 <style scoped>
@@ -1329,5 +1444,9 @@ onUnmounted(() => {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.buttonBlock {
+    margin-top: 22px;
 }
 </style>

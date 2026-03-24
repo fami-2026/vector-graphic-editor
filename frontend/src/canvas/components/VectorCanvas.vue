@@ -5,22 +5,29 @@ import { useCanvasStore } from '@/stores/canvas';
 import { useCanvasRender } from '@/canvas/composables/useCanvasRender';
 import { useInteractions } from '@/canvas/composables/useInteractions';
 
+const canvasStore = useCanvasStore();
+const { shapes, selectedId, zoom, pan, backgroundColor } = storeToRefs(canvasStore);
+
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-const canvasStore = useCanvasStore();
-const { shapes, selectedId, zoom, pan } = storeToRefs(canvasStore);
+// Получаем интеракции
+const { attachListeners, updateTransform, isSelecting, selectionStart, selectionEnd } = useInteractions(
+    canvasRef, 
+    shapes, 
+    zoom, 
+    pan
+);
 
-const { updateTransform } = useInteractions(canvasRef, shapes, zoom, pan);
+// Передаем правильное количество аргументов (5-6)
 const { draw } = useCanvasRender(
     canvasRef,
     shapes,
     selectedId,
     zoom,
     pan,
-    updateTransform
+    updateTransform  // это 6-й аргумент
 );
-const { attachListeners } = useInteractions(canvasRef, shapes, zoom, pan);
 
 let resizeObserver: ResizeObserver | null = null;
 let detachListeners: (() => void) | undefined;
@@ -84,10 +91,11 @@ watch(
         selectedId,
         zoom,
         pan,
+        backgroundColor,
         () => canvasStore.selectedIds,
         () => canvasStore.isSelecting,
-        () => canvasStore.selectionBox,
-        () => canvasStore.selectionRect,
+        () => canvasStore.selectionBox.start,
+        () => canvasStore.selectionBox.end
     ],
     () => requestAnimationFrame(draw),
     { deep: true }
@@ -97,7 +105,10 @@ watch(
 <template>
     <div ref="containerRef" class="canvas-wrapper">
         <canvas ref="canvasRef" class="main-canvas"></canvas>
-        <div v-if="canvasStore.hasSelection" class="selection-info"></div>
+        <div v-if="canvasStore.hasSelection" class="selection-info">
+            <span>Выделено: {{ canvasStore.selectedIds.length }}</span>
+            <button class="delete-btn" @click="canvasStore.deleteSelectedShapes()">Удалить</button>
+        </div>
     </div>
 </template>
 

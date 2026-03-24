@@ -33,6 +33,14 @@
                 class="item"
                 role="menuitem"
                 type="button"
+                @click="openExport('svg')"
+            >
+                SVG
+            </button>
+            <button
+                class="item"
+                role="menuitem"
+                type="button"
                 @click="exportJson"
             >
                 JSON
@@ -49,7 +57,7 @@
     >
         <div class="modalCard">
             <div class="modalHead">
-                <h3>Экспорт PNG</h3>
+                <h3>Экспорт {{ form.format.toUpperCase() }}</h3>
             </div>
 
             <label class="field">
@@ -84,7 +92,7 @@
                     Отмена
                 </button>
                 <button class="btn" type="button" @click="submitExport">
-                    Скачать PNG
+                    Скачать {{ form.format.toUpperCase() }}
                 </button>
             </div>
         </div>
@@ -100,8 +108,8 @@ import {
     exportScene,
     sanitizeFileName,
     type ExportArea,
+    type ExportBackground,
     type ExportFormat,
-    type PngBackground,
     type PngScale,
 } from '@/canvas/utils/export';
 
@@ -116,7 +124,7 @@ const form = reactive<{
     format: ExportFormat;
     area: ExportArea;
     pngScale: PngScale;
-    pngBackground: PngBackground;
+    pngBackground: ExportBackground;
 }>({
     fileName: 'vector-export',
     format: 'png',
@@ -195,7 +203,7 @@ async function submitExport() {
             sceneSize: getSceneSize(),
             selectedId: selectedId.value,
             pngScale: form.pngScale,
-            pngBackground: form.pngBackground,
+            background: form.pngBackground,
         });
 
         closeExport();
