@@ -9,11 +9,17 @@
                 <TopLeftActions />
             </div>
 
-            <div v-show="!isFocusMode" class="rightPanelWrap" :class="{ closed: !isInspectorOpen }">
+            <div
+                v-show="!isFocusMode"
+                class="rightPanelWrap"
+                :class="{ closed: !isInspectorOpen }"
+            >
                 <button
                     class="toggleInspectorBtn"
                     type="button"
-                    :title="isInspectorOpen ? 'Скрыть панель' : 'Показать панель'"
+                    :title="
+                        isInspectorOpen ? 'Скрыть панель' : 'Показать панель'
+                    "
                     @click="isInspectorOpen = !isInspectorOpen"
                 >
                     {{ isInspectorOpen ? '›' : '‹' }}
