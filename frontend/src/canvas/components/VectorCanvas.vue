@@ -12,6 +12,13 @@ const { shapes, selectedId, zoom, pan, backgroundColor } =
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
+// Получаем интеракции - убираем неиспользуемые переменные
+const { attachListeners, updateTransform } = useInteractions(
+    canvasRef,
+    shapes,
+    zoom,
+    pan
+);
 
 const { draw } = useCanvasRender(
     canvasRef,
@@ -20,7 +27,6 @@ const { draw } = useCanvasRender(
     zoom,
     pan,
 );
-const { attachListeners } = useInteractions(canvasRef, shapes, zoom, pan);
 
 let resizeObserver: ResizeObserver | null = null;
 let detachListeners: (() => void) | undefined;
@@ -86,8 +92,8 @@ watch(
         pan,
         () => canvasStore.selectedIds,
         () => canvasStore.isSelecting,
-        () => canvasStore.selectionBox,
-        () => canvasStore.selectionRect,
+        () => canvasStore.selectionBox.start,
+        () => canvasStore.selectionBox.end,
     ],
     () => requestAnimationFrame(draw),
     { deep: true }
@@ -148,3 +154,4 @@ watch(
     background: #d32f2f;
 }
 </style>
+
