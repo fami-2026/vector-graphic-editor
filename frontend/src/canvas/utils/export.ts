@@ -107,7 +107,6 @@ function resolveBackgroundFill(background: ExportBackground): string | null {
     return background;
 }
 
-
 async function exportPng(
     target: ExportTarget,
     fileName: string,
