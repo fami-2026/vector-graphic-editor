@@ -6,16 +6,17 @@ import { useCanvasRender } from '@/canvas/composables/useCanvasRender';
 import { useInteractions } from '@/canvas/composables/useInteractions';
 
 const canvasStore = useCanvasStore();
-const { shapes, selectedId, zoom, pan, backgroundColor } = storeToRefs(canvasStore);
+const { shapes, selectedId, zoom, pan, backgroundColor } =
+    storeToRefs(canvasStore);
 
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 // Получаем интеракции - убираем неиспользуемые переменные
 const { attachListeners, updateTransform } = useInteractions(
-    canvasRef, 
-    shapes, 
-    zoom, 
+    canvasRef,
+    shapes,
+    zoom,
     pan
 );
 
@@ -94,7 +95,7 @@ watch(
         () => canvasStore.selectedIds,
         () => canvasStore.isSelecting,
         () => canvasStore.selectionBox.start,
-        () => canvasStore.selectionBox.end
+        () => canvasStore.selectionBox.end,
     ],
     () => requestAnimationFrame(draw),
     { deep: true }
@@ -106,7 +107,12 @@ watch(
         <canvas ref="canvasRef" class="main-canvas"></canvas>
         <div v-if="canvasStore.hasSelection" class="selection-info">
             <span>Выделено: {{ canvasStore.selectedIds.length }}</span>
-            <button class="delete-btn" @click="canvasStore.deleteSelectedShapes()">Удалить</button>
+            <button
+                class="delete-btn"
+                @click="canvasStore.deleteSelectedShapes()"
+            >
+                Удалить
+            </button>
         </div>
     </div>
 </template>
