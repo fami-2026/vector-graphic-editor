@@ -556,17 +556,10 @@ export const useCanvasStore = defineStore('canvas', () => {
             Math.min(MAX_ZOOM, Math.round(value))
         );
         if (newZoom === zoom.value) return;
-<<<<<<< HEAD
-
-        const worldCenterX = -pan.value.x / (zoom.value / 100);
-        const worldCenterY = -pan.value.y / (zoom.value / 100);
-
-=======
         
         const worldCenterX = -pan.value.x / (zoom.value / 100);
         const worldCenterY = -pan.value.y / (zoom.value / 100);
         
->>>>>>> ee6a68f (remove extra lines)
         const newZoomFactor = newZoom / 100;
         const newPanX = -worldCenterX * newZoomFactor;
         const newPanY = -worldCenterY * newZoomFactor;
