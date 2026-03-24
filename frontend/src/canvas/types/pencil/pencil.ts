@@ -83,10 +83,6 @@ export class PencilShape extends BaseShape {
         };
     }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> acfaf46 (add drawing)
     get width(): number {
         //const box = this.getLocalBox();
         const box = this.getStrokeBounds();
@@ -165,13 +161,7 @@ export class PencilShape extends BaseShape {
 
             let t = 0;
             if (len2 > 0) {
-                t =
-<<<<<<< HEAD
-                    ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) /
-                    len2;
-=======
-                    ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) / len2;
->>>>>>> acfaf46 (add drawing)
+                t = ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) / len2;
                 t = Math.max(0, Math.min(1, t));
             }
 
@@ -184,10 +174,6 @@ export class PencilShape extends BaseShape {
         return minDist <= threshold;
     }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> acfaf46 (add drawing)
     // getLocalBox(): BoundingBox {
     //     if (!this.points.length) {
     //         return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
@@ -195,11 +181,7 @@ export class PencilShape extends BaseShape {
     //     const xs = this.points.map((p) => p.x);
     //     const ys = this.points.map((p) => p.y);
     //     const padding = this.strokeWidth / 2 + 5;
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> acfaf46 (add drawing)
     //     return {
     //         minX: Math.min(...xs) - padding,
     //         minY: Math.min(...ys) - padding,
@@ -220,10 +202,6 @@ export class PencilShape extends BaseShape {
         };
     }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> acfaf46 (add drawing)
     getBoundingBox(): BoundingBox {
         const localBox = this.getLocalBox();
         const corners = [
@@ -300,18 +278,12 @@ export class PencilShape extends BaseShape {
         ctx.restore();
     }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> acfaf46 (add drawing)
     move(delta: Point): void {
         this.position.x += delta.x;
         this.position.y += delta.y;
     }
 }
 
-<<<<<<< HEAD
 shapeRegistry.register('pencil', PencilShape);
-=======
-shapeRegistry.register('pencil', PencilShape);
->>>>>>> acfaf46 (add drawing)
+
+
