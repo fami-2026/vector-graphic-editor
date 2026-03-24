@@ -435,6 +435,10 @@ export function useInteractions(
                 false
             ) as PencilShape;
 
+            newShape.stroke = toolsStore.pencilDefaults.stroke;
+            newShape.strokeOpacity = toolsStore.pencilDefaults.strokeOpacity;
+            newShape.strokeWidth = toolsStore.pencilDefaults.strokeWidth;
+
             activeShape.value = newShape;
 
             if (canvas) {
