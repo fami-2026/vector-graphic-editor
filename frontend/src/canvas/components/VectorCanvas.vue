@@ -12,16 +12,13 @@ const { shapes, selectedId, zoom, pan, backgroundColor } =
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-const { shapes, selectedId, zoom, pan } = storeToRefs(useCanvasStore());
 
-const { updateTransform } = useInteractions(canvasRef, shapes, zoom, pan);
 const { draw } = useCanvasRender(
     canvasRef,
     shapes,
     selectedId,
     zoom,
     pan,
-    updateTransform
 );
 const { attachListeners } = useInteractions(canvasRef, shapes, zoom, pan);
 

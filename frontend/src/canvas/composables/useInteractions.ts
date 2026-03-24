@@ -1134,7 +1134,7 @@ export function useInteractions(
                     }
                 }
 
-                canvas.style.cursor = 'grab';
+                canvas.style.cursor = 'grabbing';
                 return;
             }
         }
