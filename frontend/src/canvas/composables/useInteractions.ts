@@ -1,5 +1,11 @@
 import { ref, watch, type Ref } from 'vue';
-import type { Shape, Point, BoundingBox, LineShape, PencilShape } from '@/canvas/types';
+import type {
+    Shape,
+    Point,
+    BoundingBox,
+    LineShape,
+    PencilShape,
+} from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
 import { useToolsStore, type ToolType } from '@/stores/tools';
 import { SELECTION_PADDING } from '@/canvas/types';
@@ -50,12 +56,15 @@ export function useInteractions(
     const createToolType = ref<ToolType | null>(null);
     const createParams = ref<Record<string, unknown> | null>(null);
 
-    watch(() => toolsStore.activeTool, (newTool) => {
-        if (newTool !== 'select') {
-            canvasStore.selectShape(null);
-            activeShape.value = null;
+    watch(
+        () => toolsStore.activeTool,
+        (newTool) => {
+            if (newTool !== 'select') {
+                canvasStore.selectShape(null);
+                activeShape.value = null;
+            }
         }
-    });
+    );
 
     // Синхронизация выделенной фигуры из стора
     watch(
@@ -412,7 +421,10 @@ export function useInteractions(
 
                 if (
                     !lastPoint ||
-                    Math.hypot(localPoint.x - lastPoint.x, localPoint.y - lastPoint.y) >= 1
+                    Math.hypot(
+                        localPoint.x - lastPoint.x,
+                        localPoint.y - lastPoint.y
+                    ) >= 1
                 ) {
                     pencil.addPoint(point);
                 }
@@ -719,7 +731,6 @@ export function useInteractions(
 
         if (isCreating.value) {
             if (activeShape.value) {
-
                 if (activeShape.value.type === 'pencil') {
                     const pencil = activeShape.value as PencilShape;
                     const point = getLocalPoint(e);
@@ -734,7 +745,6 @@ export function useInteractions(
 
                 canvasStore.selectShape(null);
                 activeShape.value = null;
-
 
                 if ('setCreationParams' in toolsStore) {
                     const store = toolsStore as {

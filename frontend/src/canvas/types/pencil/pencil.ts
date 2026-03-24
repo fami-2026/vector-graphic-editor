@@ -83,7 +83,6 @@ export class PencilShape extends BaseShape {
         };
     }
 
-
     get width(): number {
         //const box = this.getLocalBox();
         const box = this.getStrokeBounds();
@@ -163,7 +162,8 @@ export class PencilShape extends BaseShape {
             let t = 0;
             if (len2 > 0) {
                 t =
-                    ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) / len2;
+                    ((localPoint.x - a.x) * dx + (localPoint.y - a.y) * dy) /
+                    len2;
                 t = Math.max(0, Math.min(1, t));
             }
 
@@ -176,7 +176,6 @@ export class PencilShape extends BaseShape {
         return minDist <= threshold;
     }
 
-
     // getLocalBox(): BoundingBox {
     //     if (!this.points.length) {
     //         return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
@@ -184,7 +183,7 @@ export class PencilShape extends BaseShape {
     //     const xs = this.points.map((p) => p.x);
     //     const ys = this.points.map((p) => p.y);
     //     const padding = this.strokeWidth / 2 + 5;
-        
+
     //     return {
     //         minX: Math.min(...xs) - padding,
     //         minY: Math.min(...ys) - padding,
@@ -204,7 +203,6 @@ export class PencilShape extends BaseShape {
             maxY: box.maxY + padding,
         };
     }
-
 
     getBoundingBox(): BoundingBox {
         const localBox = this.getLocalBox();
@@ -281,7 +279,6 @@ export class PencilShape extends BaseShape {
         ctx.globalAlpha = alpha;
         ctx.restore();
     }
-
 
     move(delta: Point): void {
         this.position.x += delta.x;
