@@ -211,8 +211,6 @@ export function useCanvasRender(
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
 
-        const canvasStore = useCanvasStore();
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = canvasStore.backgroundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -228,6 +226,7 @@ export function useCanvasRender(
         ctx.scale(zoomFactor, zoomFactor);
         ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
+        // Рисуем все фигуры
         for (const shape of shapes.value) {
             ctx.save();
             shape.render(ctx);

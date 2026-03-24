@@ -187,7 +187,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function pushHistory() {
-        const snapshot = createSnapshot();
+        const snapshot = createInternalSnapshot();
         undoStack.value.push(snapshot);
         if (undoStack.value.length > HISTORY_LIMIT) {
             undoStack.value.shift();
@@ -228,7 +228,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const snapshot = undoStack.value.pop();
         if (!snapshot) return;
 
-        const current = createSnapshot();
+        const current = createInternalSnapshot();
         redoStack.value.push(current);
         restoreInternalSnapshot(snapshot);
     }
@@ -237,7 +237,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const snapshot = redoStack.value.pop();
         if (!snapshot) return;
 
-        const current = createSnapshot();
+        const current = createInternalSnapshot();
         undoStack.value.push(current);
         restoreInternalSnapshot(snapshot);
     }
@@ -532,6 +532,11 @@ export const useCanvasStore = defineStore('canvas', () => {
         };
     }
 
+    function setBackgroundColor(color: string) {
+        backgroundColor.value = color;
+        localStorage.setItem('canvas-bg-color', color);
+    }
+
     const STORAGE_KEY = 'vector-editor-canvas';
 
     function saveToLocalStorage() {
@@ -588,17 +593,8 @@ if (data.zoom) zoom.value = data.zoom;
         }
     }
 
-    function setBackgroundColor(color: string) {
-        backgroundColor.value = color;
-        localStorage.setItem('canvas-bg-color', color);
-    }
-
     async function initDocument() {
-        const localScene = createSnapshot();
-
-        // if (isOfflineMode.value) {
-        //     return;
-        // }
+        const localScene = createInternalSnapshot();
 
         try {
             if (documentId.value !== '0') {
@@ -625,7 +621,6 @@ if (data.zoom) zoom.value = data.zoom;
 
                 isOfflineMode.value = false;
                 serverError.value = null;
-
                 return;
             }
 
@@ -701,7 +696,7 @@ if (data.zoom) zoom.value = data.zoom;
         try {
             await updateCanvas(
                 documentId.value,
-                snapshotToServerContent(createSnapshot())
+                snapshotToServerContent(createInternalSnapshot())
             );
             serverError.value = null;
         } catch (error) {
@@ -717,7 +712,7 @@ if (data.zoom) zoom.value = data.zoom;
             format: 'vector-editor',
             version: 1,
             exportedAt: new Date().toISOString(),
-            scene: createSnapshot(),
+            scene: createInternalSnapshot(),
         };
 
         return JSON.stringify(payload, null, 2);
@@ -794,6 +789,7 @@ if (data.zoom) zoom.value = data.zoom;
         documentId,
         isOfflineMode,
         serverError,
+        backgroundColor,
         addShape,
         updateShape,
         deleteShape,
@@ -822,7 +818,6 @@ if (data.zoom) zoom.value = data.zoom;
         endInteraction,
         exportToJson,
         importFromJson,
-        backgroundColor,
         setBackgroundColor,
         MIN_ZOOM,
         MAX_ZOOM,
