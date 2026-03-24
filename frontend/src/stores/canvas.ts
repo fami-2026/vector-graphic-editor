@@ -36,25 +36,18 @@ type SerializedShapeBase = {
 
 type SerializedShape = SerializedShapeBase & Record<string, unknown>;
 
-// Сохраняем тип SceneSnapshot для обратной совместимости
 type SceneSnapshot = {
     shapes: SerializedShape[];
     selectedId: string | null;
 };
 
-// Добавляем новый тип для внутреннего использования
-type InternalSceneSnapshot = {
-    shapes: SerializedShape[];
-    selectedIds: string[];
-    selectionRect?: { start: Point; end: Point } | null;
-};
+
 
 type CanvasStorageData = {
     documentId: string;
     isOfflineMode: boolean;
     shapes: SerializedShape[];
     selectedId: string | null;
-    // Добавляем новые поля
     selectedIds?: string[];
     selectionRect?: { start: Point; end: Point } | null;
     zoom?: number;
@@ -66,17 +59,13 @@ type VectorEditorExport = {
     format: 'vector-editor';
     version: 1;
     exportedAt: string;
-    scene: SceneSnapshot; // Сохраняем старый формат для экспорта
+    scene: SceneSnapshot;
 };
 
 export const useCanvasStore = defineStore('canvas', () => {
     const shapes = ref<Shape[]>([]);
-    // Сохраняем selectedId для обратной совместимости
     const selectedId = ref<string | null>(null);
-    // Добавляем selectedIds для множественного выделения
     const selectedIds = ref<string[]>([]);
-
-    // Добавляем новые состояния для множественного выделения
     const selectionBox = ref<{ start: Point | null; end: Point | null }>({
         start: null,
         end: null,
@@ -102,8 +91,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     let isContinuousChangeActive = false;
     let continuousChangeTimer: number | null = null;
     const CONTINUOUS_CHANGE_TIMEOUT = 700;
-
-    // Добавляем computed для множественного выделения
     const selectedShapes = computed(() =>
         shapes.value.filter((s) => selectedIds.value.includes(s.id))
     );
@@ -126,7 +113,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         return plain;
     }
 
-    // Сохраняем старый createSnapshot
     function createSnapshot(): SceneSnapshot {
         return {
             shapes: shapes.value.map((s) => serializeShape(s)),
@@ -134,18 +120,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         };
     }
 
-    // Добавляем новый createInternalSnapshot
-    function createInternalSnapshot(): InternalSceneSnapshot {
-        return {
-            shapes: shapes.value.map((s) => serializeShape(s)),
-            selectedIds: [...selectedIds.value],
-            selectionRect: selectionRect.value
-                ? { ...selectionRect.value }
-                : null,
-        };
-    }
-
-    // Сохраняем старый restoreSnapshot
     function restoreSnapshot(snapshot: SceneSnapshot) {
         const restored: Shape[] = snapshot.shapes.map((plain) => {
             const { type, id, position, ...rest } = plain;
@@ -156,28 +130,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
         shapes.value = restored;
         selectedId.value = snapshot.selectedId;
-        // Синхронизируем selectedIds с selectedId
         selectedIds.value = snapshot.selectedId ? [snapshot.selectedId] : [];
         selectionRect.value = null;
-    }
-
-    // Добавляем новый restoreInternalSnapshot
-    function restoreInternalSnapshot(snapshot: InternalSceneSnapshot) {
-        const restored: Shape[] = snapshot.shapes.map((plain) => {
-            const { type, id, position, ...rest } = plain;
-            const shape = shapeRegistry.create(type, id, position);
-            Object.assign(shape, rest);
-            return shape as Shape;
-        });
-
-        shapes.value = restored;
-        selectedIds.value = snapshot.selectedIds || [];
-        selectedId.value = snapshot.selectedIds[0] || null;
-        if (snapshot.selectionRect) {
-            selectionRect.value = { ...snapshot.selectionRect };
-        } else {
-            selectionRect.value = null;
-        }
     }
 
     function snapshotToServerContent(
@@ -248,14 +202,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     const canUndo = computed(() => undoStack.value.length > 0);
     const canRedo = computed(() => redoStack.value.length > 0);
 
-    // Сохраняем старый selectShape
     function selectShape(id: string | null) {
         selectedId.value = id;
         selectedIds.value = id ? [id] : [];
         selectionRect.value = null;
     }
 
-    // Добавляем новый selectShapeWithAdd
     function selectShapeWithAdd(id: string | null, addToSelection: boolean = false) {
         if (!id) {
             if (!addToSelection) {
@@ -280,7 +232,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
     }
 
-    // Добавляем новые методы для множественного выделения
     function selectShapesInRect(rect: {
         minX: number;
         minY: number;
@@ -827,16 +778,16 @@ documentId.value = data.documentId ? String(data.documentId) : '0';            }
 
     return {
         shapes,
-        selectedId, // сохранен для обратной совместимости
-        selectedIds, // новый для множественного выделения
-        selectedShapes, // новый
-        hasSelection, // новый
-        selectionCount, // новый
+        selectedId,
+        selectedIds, 
+        selectedShapes, 
+        hasSelection, 
+        selectionCount, 
         selectedShape,
-        selectionBox, // новый
-        selectionRect, // новый
-        isSelecting, // новый
-        dragStartPositions, // новый
+        selectionBox, 
+        selectionRect, 
+        isSelecting, 
+        dragStartPositions, 
         MIN_ZOOM,
         MAX_ZOOM,
         ZOOM_STEP,
@@ -849,17 +800,17 @@ documentId.value = data.documentId ? String(data.documentId) : '0';            }
         addShape,
         updateShape,
         deleteShape,
-        selectShape, // сохранен для обратной совместимости
-        selectShapeWithAdd, // новый
-        selectShapesInRect, // новый
-        startSelection, // новый
-        updateSelection, // новый
-        endSelection, // новый
-        setDragStartPositions, // новый
-        moveSelectedShapes, // новый
-        deleteSelectedShapes, // новый
-        selectAll, // новый
-        clearSelection, // новый
+        selectShape, 
+        selectShapeWithAdd, 
+        selectShapesInRect, 
+        startSelection, 
+        updateSelection, 
+        endSelection, 
+        setDragStartPositions, 
+        moveSelectedShapes, 
+        deleteSelectedShapes, 
+        selectAll, 
+        clearSelection, 
         moveShape,
         undo,
         redo,

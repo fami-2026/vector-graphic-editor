@@ -56,7 +56,6 @@ const updateCanvasSize = () => {
     }
 };
 
-// Функция для плавной отрисовки
 const scheduleDraw = () => {
     if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
@@ -86,7 +85,6 @@ onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
 });
 
-// Отслеживаем все изменения для перерисовки
 watch(
     [shapes, selectedId, zoom, pan, backgroundColor, isSelecting, selectionBox],
     () => scheduleDraw(),

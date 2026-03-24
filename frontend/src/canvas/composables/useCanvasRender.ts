@@ -109,7 +109,7 @@ export function useCanvasRender(
         const canvas = canvasRef.value;
         if (!canvas) return;
 
-        // Отрисовка активной рамки выделения (во время выделения)
+  
         if (
             canvasStore.isSelecting &&
             canvasStore.selectionBox.start &&
@@ -135,7 +135,6 @@ export function useCanvasRender(
             ctx.setLineDash([]);
         }
 
-        // Отрисовка финальной рамки выделения группы
         if (
             canvasStore.selectionRect &&
             !canvasStore.isSelecting &&
@@ -208,21 +207,18 @@ export function useCanvasRender(
         ctx.scale(zoomFactor, zoomFactor);
         ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-        // Рисуем все фигуры
         for (const shape of shapes.value) {
             ctx.save();
             shape.render(ctx);
             ctx.restore();
         }
 
-        // Рисуем рамки выделения для всех выделенных фигур
         for (const shape of shapes.value) {
             if (canvasStore.selectedIds.includes(shape.id)) {
                 drawSelectionBox(ctx, shape);
             }
         }
 
-        // Рисуем рамку выделения (активную и финальную)
         drawSelectionRect(ctx);
 
         ctx.restore();
