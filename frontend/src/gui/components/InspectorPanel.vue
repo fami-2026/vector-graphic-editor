@@ -142,11 +142,8 @@
                                 :class="{
                                     disabled: !selectedShape || isFillDisabled,
                                 }"
-                                @click="
-                                    !isFillDisabled && showColorPicker('fill')
-                                "
-
-                            >
+                                @click="!isFillDisabled && showColorPicker('fill')"
+                            />
                             <Teleport to="body">
                                 <div
                                     v-if="activePicker === 'fill'"
