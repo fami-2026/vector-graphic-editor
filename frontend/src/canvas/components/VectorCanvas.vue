@@ -13,7 +13,7 @@ const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 // Получаем интеракции - убираем неиспользуемые переменные
-const { attachListeners, updateTransform } = useInteractions(
+const { attachListeners } = useInteractions(
     canvasRef,
     shapes,
     zoom,
