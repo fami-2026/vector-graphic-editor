@@ -3,10 +3,6 @@ import type { Shape, LineShape } from '@/canvas/types';
 import { SELECTION_PADDING } from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
 
-/**
- * Composable для отрисовки фигур на канвасе.
- */
-
 function isLineShape(shape: Shape): shape is LineShape {
     return shape.type === 'line';
 }
@@ -20,9 +16,8 @@ export function useCanvasRender(
     zoom: Ref<number>,
     pan: Ref<{ x: number; y: number }>
 ) {
-    /**
-     * Рисует рамку выделения вокруг фигуры с учетом её поворота и масштаба.
-     */
+    const canvasStore = useCanvasStore();
+
     function drawSelectionBox(ctx: CanvasRenderingContext2D, shape: Shape) {
         ctx.save();
 
@@ -33,7 +28,7 @@ export function useCanvasRender(
             const line = shape;
 
             ctx.fillStyle = '#ffffff';
-            ctx.strokeStyle = '#2196F3'; // Синий цвет Figma
+            ctx.strokeStyle = '#2196F3';
             ctx.lineWidth = 1.5;
 
             ctx.beginPath();
@@ -94,10 +89,10 @@ export function useCanvasRender(
             const hY2 = rectY + rectH;
 
             const handles: Array<[number, number]> = [
-                [hX1, hY1], // lt
-                [hX2, hY1], // rt
-                [hX2, hY2], // rb
-                [hX1, hY2], // lb
+                [hX1, hY1],
+                [hX2, hY1],
+                [hX2, hY2],
+                [hX1, hY2],
             ];
 
             handles.forEach(([x, y]) => {
@@ -110,15 +105,94 @@ export function useCanvasRender(
         ctx.restore();
     }
 
-    /**
-     * Основной цикл отрисовки. Очищает канвас и отрисовывает все фигуры.
-     */
+    function drawSelectionRect(ctx: CanvasRenderingContext2D) {
+        const canvas = canvasRef.value;
+        if (!canvas) return;
+
+        // Отрисовка активной рамки выделения (во время выделения)
+        if (
+            canvasStore.isSelecting &&
+            canvasStore.selectionBox.start &&
+            canvasStore.selectionBox.end
+        ) {
+            const start = canvasStore.selectionBox.start;
+            const end = canvasStore.selectionBox.end;
+
+            const rect = {
+                x: Math.min(start.x, end.x),
+                y: Math.min(start.y, end.y),
+                width: Math.abs(end.x - start.x),
+                height: Math.abs(end.y - start.y),
+            };
+
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+
+            ctx.fillStyle = 'rgba(33, 150, 243, 0.1)';
+            ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+            ctx.setLineDash([]);
+        }
+
+        // Отрисовка финальной рамки выделения группы
+        if (
+            canvasStore.selectionRect &&
+            !canvasStore.isSelecting &&
+            canvasStore.selectedIds.length > 0
+        ) {
+            const rect = {
+                x: Math.min(
+                    canvasStore.selectionRect.start.x,
+                    canvasStore.selectionRect.end.x
+                ),
+                y: Math.min(
+                    canvasStore.selectionRect.start.y,
+                    canvasStore.selectionRect.end.y
+                ),
+                width: Math.abs(
+                    canvasStore.selectionRect.end.x -
+                        canvasStore.selectionRect.start.x
+                ),
+                height: Math.abs(
+                    canvasStore.selectionRect.end.y -
+                        canvasStore.selectionRect.start.y
+                ),
+            };
+
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+
+            ctx.fillStyle = 'rgba(33, 150, 243, 0.05)';
+            ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = 1.5;
+
+            const handles: Array<[number, number]> = [
+                [rect.x, rect.y],
+                [rect.x + rect.width, rect.y],
+                [rect.x + rect.width, rect.y + rect.height],
+                [rect.x, rect.y + rect.height],
+            ];
+
+            handles.forEach(([x, y]) => {
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+        }
+    }
+
     function draw() {
         const canvas = canvasRef.value;
         const ctx = canvas?.getContext('2d');
         if (!canvas || !ctx) return;
-
-        const canvasStore = useCanvasStore();
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = canvasStore.backgroundColor;
@@ -126,6 +200,7 @@ export function useCanvasRender(
 
         const zoomFactor = zoom.value / 100;
         ctx.save();
+
         ctx.translate(
             canvas.width / 2 + pan.value.x,
             canvas.height / 2 + pan.value.y
@@ -133,20 +208,22 @@ export function useCanvasRender(
         ctx.scale(zoomFactor, zoomFactor);
         ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
+        // Рисуем все фигуры
         for (const shape of shapes.value) {
             ctx.save();
             shape.render(ctx);
             ctx.restore();
         }
 
-        if (selectedId.value) {
-            const selectedShape = shapes.value.find(
-                (s) => s.id === selectedId.value
-            );
-            if (selectedShape) {
-                drawSelectionBox(ctx, selectedShape);
+        // Рисуем рамки выделения для всех выделенных фигур
+        for (const shape of shapes.value) {
+            if (canvasStore.selectedIds.includes(shape.id)) {
+                drawSelectionBox(ctx, shape);
             }
         }
+
+        // Рисуем рамку выделения (активную и финальную)
+        drawSelectionRect(ctx);
 
         ctx.restore();
     }
