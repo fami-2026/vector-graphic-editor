@@ -261,6 +261,7 @@
                         :value="strokeWidth"
                         :disabled="!selectedShape"
                         min="0"
+                        max="5"
                         step="0.5"
                         @input="onNumberChange('strokeWidth', $event)"
                         @wheel.prevent="onWheelChange('strokeWidth', $event)"
@@ -649,8 +650,12 @@ type NumberFieldKey =
 function onNumberChange(key: NumberFieldKey, event: Event) {
     if (!selectedShape.value) return;
     const target = event.target as HTMLInputElement;
-    const value = Number(target.value);
+    let value = Number(target.value);
     if (Number.isNaN(value)) return;
+
+    if (key === 'strokeWidth') {
+        value = Math.min(5, Math.max(0, value));
+    }
 
     canvasStore.updateShape(selectedShape.value.id, {
         [key]: value,
@@ -675,7 +680,7 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
         newValue = ((newValue % 360) + 360) % 360;
     }
     if (key === 'strokeWidth') {
-        newValue = Math.max(0, newValue);
+        newValue = Math.min(5, Math.max(0, newValue));
     }
 
     canvasStore.updateShape(selectedShape.value.id, {
