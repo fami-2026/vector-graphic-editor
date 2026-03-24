@@ -13,21 +13,10 @@ const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 // Получаем интеракции - убираем неиспользуемые переменные
-const { attachListeners } = useInteractions(
-    canvasRef,
-    shapes,
-    zoom,
-    pan
-);
+const { attachListeners } = useInteractions(canvasRef, shapes, zoom, pan);
 
-const { draw } = useCanvasRender(
-    canvasRef,
-    shapes,
-    selectedId,
-    zoom,
-    pan,
-);
- 
+const { draw } = useCanvasRender(canvasRef, shapes, selectedId, zoom, pan);
+
 let resizeObserver: ResizeObserver | null = null;
 let detachListeners: (() => void) | undefined;
 
@@ -155,4 +144,3 @@ watch(
     background: #d32f2f;
 }
 </style>
-
