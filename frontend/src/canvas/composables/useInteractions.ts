@@ -1261,5 +1261,11 @@ export function useInteractions(
         };
     }
 
-    return { attachListeners, updateTransform };
+        return { 
+    attachListeners, 
+    updateTransform,
+    isSelecting: canvasStore.isSelecting,
+    selectionStart: canvasStore.selectionBox.start,
+    selectionEnd: canvasStore.selectionBox.end
+};
 }
