@@ -6,8 +6,17 @@ import { useCanvasRender } from '@/canvas/composables/useCanvasRender';
 import { useInteractions } from '@/canvas/composables/useInteractions';
 
 const canvasStore = useCanvasStore();
-const { shapes, selectedId, zoom, pan, backgroundColor, hasSelection, selectionCount, isSelecting, selectionBox } =
-    storeToRefs(canvasStore);
+const {
+    shapes,
+    selectedId,
+    zoom,
+    pan,
+    backgroundColor,
+    hasSelection,
+    selectionCount,
+    isSelecting,
+    selectionBox,
+} = storeToRefs(canvasStore);
 
 const containerRef = ref<HTMLDivElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);

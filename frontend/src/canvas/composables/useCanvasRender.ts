@@ -109,7 +109,6 @@ export function useCanvasRender(
         const canvas = canvasRef.value;
         if (!canvas) return;
 
-  
         if (
             canvasStore.isSelecting &&
             canvasStore.selectionBox.start &&

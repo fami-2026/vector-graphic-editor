@@ -41,8 +41,6 @@ type SceneSnapshot = {
     selectedId: string | null;
 };
 
-
-
 type CanvasStorageData = {
     documentId: string;
     isOfflineMode: boolean;
@@ -208,7 +206,10 @@ export const useCanvasStore = defineStore('canvas', () => {
         selectionRect.value = null;
     }
 
-    function selectShapeWithAdd(id: string | null, addToSelection: boolean = false) {
+    function selectShapeWithAdd(
+        id: string | null,
+        addToSelection: boolean = false
+    ) {
         if (!id) {
             if (!addToSelection) {
                 selectedIds.value = [];
@@ -337,7 +338,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
         selectedIds.value = shapes.value.map((s) => s.id);
         selectedId.value = selectedIds.value[0] || null;
-        
+
         if (selectedIds.value.length > 0) {
             const allPoints = shapes.value.flatMap((s) => {
                 const box = s.getBoundingBox();
@@ -551,7 +552,9 @@ export const useCanvasStore = defineStore('canvas', () => {
                 shapes: shapes.value.map(serializeShape),
                 selectedId: selectedId.value,
                 selectedIds: selectedIds.value,
-                selectionRect: selectionRect.value ? { ...selectionRect.value } : null,
+                selectionRect: selectionRect.value
+                    ? { ...selectionRect.value }
+                    : null,
                 zoom: zoom.value,
                 pan: pan.value,
                 backgroundColor: backgroundColor.value,
@@ -572,7 +575,8 @@ export const useCanvasStore = defineStore('canvas', () => {
             isOfflineMode.value = Boolean(data.isOfflineMode ?? false);
             if (data.zoom) zoom.value = data.zoom;
             if (data.pan) pan.value = data.pan;
-            if (data.backgroundColor) backgroundColor.value = data.backgroundColor;
+            if (data.backgroundColor)
+                backgroundColor.value = data.backgroundColor;
 
             const restored: Shape[] = (data.shapes ?? []).map(
                 (plain: SerializedShape) => {
@@ -586,7 +590,10 @@ export const useCanvasStore = defineStore('canvas', () => {
             shapes.value = restored;
             if (data.selectedIds && data.selectedIds.length > 0) {
                 selectedIds.value = data.selectedIds;
-documentId.value = data.documentId ? String(data.documentId) : '0';            } else {
+                documentId.value = data.documentId
+                    ? String(data.documentId)
+                    : '0';
+            } else {
                 selectedId.value = data.selectedId ?? null;
                 selectedIds.value = selectedId.value ? [selectedId.value] : [];
             }
@@ -779,15 +786,15 @@ documentId.value = data.documentId ? String(data.documentId) : '0';            }
     return {
         shapes,
         selectedId,
-        selectedIds, 
-        selectedShapes, 
-        hasSelection, 
-        selectionCount, 
+        selectedIds,
+        selectedShapes,
+        hasSelection,
+        selectionCount,
         selectedShape,
-        selectionBox, 
-        selectionRect, 
-        isSelecting, 
-        dragStartPositions, 
+        selectionBox,
+        selectionRect,
+        isSelecting,
+        dragStartPositions,
         MIN_ZOOM,
         MAX_ZOOM,
         ZOOM_STEP,
@@ -800,17 +807,17 @@ documentId.value = data.documentId ? String(data.documentId) : '0';            }
         addShape,
         updateShape,
         deleteShape,
-        selectShape, 
-        selectShapeWithAdd, 
-        selectShapesInRect, 
-        startSelection, 
-        updateSelection, 
-        endSelection, 
-        setDragStartPositions, 
-        moveSelectedShapes, 
-        deleteSelectedShapes, 
-        selectAll, 
-        clearSelection, 
+        selectShape,
+        selectShapeWithAdd,
+        selectShapesInRect,
+        startSelection,
+        updateSelection,
+        endSelection,
+        setDragStartPositions,
+        moveSelectedShapes,
+        deleteSelectedShapes,
+        selectAll,
+        clearSelection,
         moveShape,
         undo,
         redo,
