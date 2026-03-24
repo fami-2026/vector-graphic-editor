@@ -1,0 +1,1 @@
+export { ParallelogramShape } from './parallelogram';

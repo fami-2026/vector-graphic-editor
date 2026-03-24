@@ -16,6 +16,7 @@ import {
     Pentagon,
     Pencil,
     CopyPlus,
+    Diamond,
 } from 'lucide-vue-next';
 import { useToolsStore, type ToolType } from '@/stores/tools';
 import { useCanvasStore } from '@/stores/canvas';
@@ -31,6 +32,7 @@ type ToolId =
     | 'polygon'
     | 'star'
     | 'hexagon'
+    | 'parallelogram'
     | 'arrow'
     | 'eraser'
     | 'pencil'
@@ -52,6 +54,7 @@ const tools: Tool[] = [
     { id: 'polygon', title: 'Многоугольник', icon: Pentagon },
     { id: 'star', title: 'Звезда', icon: Star },
     { id: 'hexagon', title: 'Шестиугольник', icon: Hexagon },
+    { id: 'parallelogram', title: 'Параллелограмм', icon: Diamond },
     { id: 'arrow', title: 'Стрелка', icon: ArrowUp },
     { id: 'eraser', title: 'Ластик', icon: Eraser },
     { id: 'pencil', title: 'Карандаш', icon: Pencil },
@@ -127,6 +130,9 @@ function handleClick(tool: Tool) {
         case 'hexagon':
             toolsStore.setActiveTool('hexagon');
             break;
+        case 'parallelogram':
+            toolsStore.setActiveTool('parallelogram');
+            break;
         case 'arrow':
             toolsStore.setActiveTool('arrow');
             break;
@@ -174,6 +180,7 @@ const activeId = computed<ToolId>(() => {
     if (active === 'polygon') return 'polygon';
     if (active === 'star') return 'star';
     if (active === 'hexagon') return 'hexagon';
+    if (active === 'parallelogram') return 'parallelogram';
     if (active === 'arrow') return 'arrow';
     if (active === 'eraser') return 'eraser';
     if (active === 'pencil') return 'pencil';

@@ -458,6 +458,7 @@ export function useInteractions(
             'circle',
             'line',
             'triangle',
+            'parallelogram',
             'polygon',
             'star',
             'hexagon',
