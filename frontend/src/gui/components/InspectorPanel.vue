@@ -274,6 +274,7 @@
                         :value="strokeWidth"
                         :disabled="!selectedShape && !isPencilToolMode"
                         min="0"
+                        :max="MAX_STROKE_WIDTH"
                         step="0.5"
                         @blur="onNumberChange('strokeWidth', $event)"
                         @keydown.enter.prevent="
@@ -613,6 +614,8 @@ const inputRefs = ref<Record<string, HTMLInputElement>>({});
 
 const toolsStore = useToolsStore();
 
+const MAX_STROKE_WIDTH = 5;
+
 const setInputRef = (el: HTMLInputElement | null, shapeId: string) => {
     if (el) {
         inputRefs.value[shapeId] = el;
@@ -704,7 +707,7 @@ function normalizeNumberByKey(key: NumberFieldKey, value: number) {
         return Math.max(1, value);
     }
     if (key === 'strokeWidth') {
-        return Math.max(0, value);
+        return Math.min(MAX_STROKE_WIDTH, Math.max(0, value));
     }
     if (key === 'rotation') {
         return ((value % 360) + 360) % 360;
@@ -791,7 +794,10 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
         const step = wheelStepConfig[key];
         const delta = event.deltaY > 0 ? -step : step;
         const currentValue = toolsStore.pencilDefaults.strokeWidth;
-        const newValue = Math.max(0, currentValue + delta);
+        const newValue = Math.min(
+            MAX_STROKE_WIDTH,
+            Math.max(0, currentValue + delta)
+        );
 
         toolsStore.setPencilDefaults({
             strokeWidth: Math.round(newValue * 100) / 100,
@@ -814,7 +820,7 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
         newValue = ((newValue % 360) + 360) % 360;
     }
     if (key === 'strokeWidth') {
-        newValue = Math.min(5, Math.max(1, newValue));
+        newValue = Math.min(MAX_STROKE_WIDTH, Math.max(1, newValue));
     }
 
     canvasStore.updateShape(selectedShape.value.id, {
