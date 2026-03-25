@@ -871,11 +871,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     void initDocument();
 
     watch(
-<<<<<<< HEAD
-        [shapes, selectedId, documentId, isOfflineMode, backgroundColor],
-=======
-        [shapes, selectedId, documentId, isOfflineMode, zoom, pan],
->>>>>>> 493d492 (Исправлено восстановление положения холста к положению по умолчанию при обновлении страницы)
+        [
+            shapes,
+            selectedId,
+            documentId,
+            isOfflineMode,
+            zoom,
+            pan,
+            backgroundColor,
+        ],
         () => {
             saveToLocalStorage();
             void syncDocument();
