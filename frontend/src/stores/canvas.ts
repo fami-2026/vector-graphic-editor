@@ -46,16 +46,11 @@ type CanvasStorageData = {
     isOfflineMode: boolean;
     shapes: SerializedShape[];
     selectedId: string | null;
-<<<<<<< HEAD
     selectedIds?: string[];
     selectionRect?: { start: Point; end: Point } | null;
-    zoom?: number;
-    pan?: { x: number; y: number };
-    backgroundColor?: string;
-=======
     zoom: number;
     pan: { x: number; y: number };
->>>>>>> 493d492 (Исправлено восстановление положения холста к положению по умолчанию при обновлении страницы)
+    backgroundColor?: string;
 };
 
 type VectorEditorExport = {
