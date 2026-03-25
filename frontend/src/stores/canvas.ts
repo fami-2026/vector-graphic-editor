@@ -431,12 +431,21 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function updateShape(id: string, updates: Partial<Shape>) {
-        ensureHistoryForContinuousChange();
         const shape = shapes.value.find((s) => s.id === id);
-        if (shape) {
-            Object.assign(shape, updates);
-            shapes.value = [...shapes.value];
+        if (!shape) return;
+
+        const hasRealChange = Object.entries(updates).some(([key, value]) => {
+            const current = (shape as unknown as Record<string, unknown>)[key];
+            return !Object.is(current, value);
+        });
+
+        if (!hasRealChange) {
+            return;
         }
+
+        ensureHistoryForContinuousChange();
+        Object.assign(shape, updates);
+        shapes.value = [...shapes.value];
     }
 
     function deleteShape(id: string) {

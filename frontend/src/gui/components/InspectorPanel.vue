@@ -14,7 +14,8 @@
                         aria-label="X"
                         :value="selectedShape?.x ?? ''"
                         :disabled="!selectedShape"
-                        @input="onNumberChange('x', $event)"
+                        @blur="onNumberChange('x', $event)"
+                        @keydown.enter.prevent="onNumberEnter('x', $event)"
                         @wheel.prevent="onWheelChange('x', $event)"
                     />
                     <input
@@ -23,7 +24,8 @@
                         aria-label="Y"
                         :value="selectedShape?.y ?? ''"
                         :disabled="!selectedShape"
-                        @input="onNumberChange('y', $event)"
+                        @blur="onNumberChange('y', $event)"
+                        @keydown.enter.prevent="onNumberEnter('y', $event)"
                         @wheel.prevent="onWheelChange('y', $event)"
                     />
                 </div>
@@ -41,7 +43,10 @@
                             :value="shapeWidth"
                             :disabled="!selectedShape"
                             min="1"
-                            @input="onNumberChange('width', $event)"
+                            @blur="onNumberChange('width', $event)"
+                            @keydown.enter.prevent="
+                                onNumberEnter('width', $event)
+                            "
                             @wheel.prevent="onWheelChange('width', $event)"
                         />
                         <input
@@ -51,7 +56,10 @@
                             :value="shapeHeight"
                             :disabled="!selectedShape"
                             min="1"
-                            @input="onNumberChange('height', $event)"
+                            @blur="onNumberChange('height', $event)"
+                            @keydown.enter.prevent="
+                                onNumberEnter('height', $event)
+                            "
                             @wheel.prevent="onWheelChange('height', $event)"
                         />
                     </div>
@@ -95,7 +103,10 @@
                         :disabled="!selectedShape"
                         min="0"
                         max="360"
-                        @input="onNumberChange('rotation', $event)"
+                        @blur="onNumberChange('rotation', $event)"
+                        @keydown.enter.prevent="
+                            onNumberEnter('rotation', $event)
+                        "
                         @wheel.prevent="onWheelChange('rotation', $event)"
                     />
                     <div class="spacer" aria-hidden="true" />
@@ -260,9 +271,13 @@
                         aria-label="Stroke width"
                         :value="strokeWidth"
                         :disabled="!selectedShape"
-                        min="0"
+                        min="1"
+                        max="5"
                         step="0.5"
-                        @input="onNumberChange('strokeWidth', $event)"
+                        @blur="onNumberChange('strokeWidth', $event)"
+                        @keydown.enter.prevent="
+                            onNumberEnter('strokeWidth', $event)
+                        "
                         @wheel.prevent="onWheelChange('strokeWidth', $event)"
                     />
                     <div class="spacer" aria-hidden="true" />
@@ -574,11 +589,13 @@ function handleClickOutside(event: MouseEvent) {
 onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
     document.addEventListener('click', handleClickOutside);
+    document.addEventListener('mousedown', commitAfterClick, true);
 });
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
     document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener('mousedown', commitAfterClick, true);
 });
 
 const canvasStore = useCanvasStore();
@@ -646,15 +663,91 @@ type NumberFieldKey =
     | 'scaleX'
     | 'scaleY';
 
-function onNumberChange(key: NumberFieldKey, event: Event) {
+function getCurrentNumberValue(key: NumberFieldKey): number | null {
+    if (!selectedShape.value) return null;
+    const value = (selectedShape.value as unknown as Record<string, unknown>)[
+        key
+    ];
+    return typeof value === 'number' ? value : null;
+}
+
+function normalizeNumberByKey(key: NumberFieldKey, value: number) {
+    if (key === 'width' || key === 'height') {
+        return Math.max(1, value);
+    }
+    if (key === 'strokeWidth') {
+        return Math.min(5, Math.max(1, value));
+    }
+    if (key === 'rotation') {
+        return ((value % 360) + 360) % 360;
+    }
+    return value;
+}
+
+function applyNumberValue(key: NumberFieldKey, target: HTMLInputElement) {
     if (!selectedShape.value) return;
-    const target = event.target as HTMLInputElement;
-    const value = Number(target.value);
-    if (Number.isNaN(value)) return;
+    const raw = target.value.trim();
+    if (raw === '') {
+        const currentValue = getCurrentNumberValue(key);
+        target.value = currentValue === null ? '' : String(currentValue);
+        return;
+    }
+    const parsed = Number(raw);
+    if (Number.isNaN(parsed)) {
+        if (selectedShape.value) {
+            const currentValue = getCurrentNumberValue(key);
+            target.value = currentValue === null ? '' : String(currentValue);
+        }
+        return;
+    }
+
+    const normalized =
+        Math.round(normalizeNumberByKey(key, parsed) * 100) / 100;
+    target.value = String(normalized);
+    const currentValue = getCurrentNumberValue(key);
+
+    if (currentValue !== null && normalized === currentValue) {
+        return;
+    }
 
     canvasStore.updateShape(selectedShape.value.id, {
-        [key]: value,
+        [key]: normalized,
     } as Partial<Shape>);
+}
+
+function onNumberChange(key: NumberFieldKey, event: Event) {
+    const target = event.target as HTMLInputElement;
+    applyNumberValue(key, target);
+}
+
+function onNumberEnter(key: NumberFieldKey, event: KeyboardEvent) {
+    onNumberChange(key, event);
+    const target = event.target as HTMLInputElement | null;
+    target?.blur();
+}
+
+function commitAfterClick(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('.panel')) return;
+
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLInputElement)) return;
+    if (activeElement.type !== 'number') return;
+    if (!activeElement.closest('.panel')) return;
+
+    const keyMap: Record<string, NumberFieldKey> = {
+        X: 'x',
+        Y: 'y',
+        Width: 'width',
+        Height: 'height',
+        Rotation: 'rotation',
+        'Stroke width': 'strokeWidth',
+    };
+    const ariaLabel = activeElement.getAttribute('aria-label') ?? '';
+    const key = keyMap[ariaLabel];
+    if (!key) return;
+
+    applyNumberValue(key, activeElement);
 }
 
 function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
@@ -675,7 +768,7 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
         newValue = ((newValue % 360) + 360) % 360;
     }
     if (key === 'strokeWidth') {
-        newValue = Math.max(0, newValue);
+        newValue = Math.min(5, Math.max(1, newValue));
     }
 
     canvasStore.updateShape(selectedShape.value.id, {
