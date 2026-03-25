@@ -335,6 +335,24 @@
                                     stroke-width="2"
                                     stroke-linecap="round"
                                 />
+
+                                <!-- Стрелка (линия с наконечником) -->
+                                <g v-else-if="shape.type === 'arrow'">
+                                    <line
+                                        x1="3"
+                                        y1="10"
+                                        x2="16"
+                                        y2="10"
+                                        :stroke="thumbStroke(shape)"
+                                        stroke-width="1.5"
+                                        stroke-linecap="round"
+                                    />
+                                    <polygon
+                                        points="16,7 19,10 16,13"
+                                        :fill="thumbStroke(shape)"
+                                    />
+                                </g>
+
                                 <!-- Все остальные полигональные фигуры -->
                                 <polygon
                                     v-else
@@ -732,8 +750,8 @@ function getThumbPoints(shape: Shape): string {
         }
         case 'hexagon':
             return generatePolygonPoints(6, 10, 10, 8);
-        case 'arrow':
-            return '1,8 12,8 12,3 19,10 12,17 12,12 1,12';
+        //case 'arrow':
+          //  return '1,8 12,8 12,3 19,10 12,17 12,12 1,12';
         default:
             return generatePolygonPoints(5, 10, 10, 8);
     }
