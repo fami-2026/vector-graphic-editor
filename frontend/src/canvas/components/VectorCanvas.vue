@@ -28,7 +28,20 @@ let resizeObserver: ResizeObserver | null = null;
 let detachListeners: (() => void) | undefined;
 let animationFrameId: number | null = null;
 
+function isEditableElement(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName;
+    return (
+        target.isContentEditable ||
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT'
+    );
+}
+
 const handleKeyDown = (e: KeyboardEvent) => {
+    if (isEditableElement(e.target)) return;
+
     if (
         (e.key === 'Delete' || e.key === 'Backspace') &&
         canvasStore.hasSelection
