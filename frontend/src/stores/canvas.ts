@@ -48,8 +48,8 @@ type CanvasStorageData = {
     selectedId: string | null;
     selectedIds?: string[];
     selectionRect?: { start: Point; end: Point } | null;
-    zoom?: number;
-    pan?: { x: number; y: number };
+    zoom: number;
+    pan: { x: number; y: number };
     backgroundColor?: string;
 };
 
@@ -637,7 +637,7 @@ export const useCanvasStore = defineStore('canvas', () => {
                     ? { ...selectionRect.value }
                     : null,
                 zoom: zoom.value,
-                pan: pan.value,
+                pan: { ...pan.value },
                 backgroundColor: backgroundColor.value,
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -654,10 +654,25 @@ export const useCanvasStore = defineStore('canvas', () => {
             const data = JSON.parse(saved) as Partial<CanvasStorageData>;
             documentId.value = String(data.documentId ?? '0');
             isOfflineMode.value = Boolean(data.isOfflineMode ?? false);
-            if (data.zoom) zoom.value = data.zoom;
-            if (data.pan) pan.value = data.pan;
-            if (data.backgroundColor)
+            zoom.value = Math.max(
+                MIN_ZOOM,
+                Math.min(MAX_ZOOM, Number(data.zoom ?? 100))
+            );
+
+            const savedPan = data.pan;
+            pan.value = {
+                x: Number(savedPan?.x ?? 0),
+                y: Number(savedPan?.y ?? 0),
+            };
+
+            if (data.backgroundColor) {
                 backgroundColor.value = data.backgroundColor;
+            } else {
+                const savedBgColor = localStorage.getItem('canvas-bg-color');
+                if (savedBgColor) {
+                    backgroundColor.value = savedBgColor;
+                }
+            }
 
             const restored: Shape[] = (data.shapes ?? []).map(
                 (plain: SerializedShape) => {
@@ -856,7 +871,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     void initDocument();
 
     watch(
-        [shapes, selectedId, documentId, isOfflineMode, backgroundColor],
+        [
+            shapes,
+            selectedId,
+            documentId,
+            isOfflineMode,
+            zoom,
+            pan,
+            backgroundColor,
+        ],
         () => {
             saveToLocalStorage();
             void syncDocument();
