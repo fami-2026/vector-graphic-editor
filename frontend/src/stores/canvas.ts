@@ -658,13 +658,13 @@ export const useCanvasStore = defineStore('canvas', () => {
                 MIN_ZOOM,
                 Math.min(MAX_ZOOM, Number(data.zoom ?? 100))
             );
-            
+
             const savedPan = data.pan;
             pan.value = {
                 x: Number(savedPan?.x ?? 0),
                 y: Number(savedPan?.y ?? 0),
             };
-            
+
             if (data.backgroundColor) {
                 backgroundColor.value = data.backgroundColor;
             } else {
