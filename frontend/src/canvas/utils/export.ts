@@ -353,7 +353,6 @@ function getTotalBounds(shapes: Shape[]): ExportBounds {
     if (shapes.length === 0) {
         return { x: 0, y: 0, width: 1, height: 1 };
     }
-
     const bounds = shapes.map((shape) => shape.getBoundingBox());
 
     const minX = Math.min(...bounds.map((b) => b.minX));

@@ -183,7 +183,6 @@ export class PencilShape extends BaseShape {
     //     const xs = this.points.map((p) => p.x);
     //     const ys = this.points.map((p) => p.y);
     //     const padding = this.strokeWidth / 2 + 5;
-
     //     return {
     //         minX: Math.min(...xs) - padding,
     //         minY: Math.min(...ys) - padding,

@@ -33,14 +33,6 @@
                 class="item"
                 role="menuitem"
                 type="button"
-                @click="exportJson"
-            >
-                JSON
-            </button>
-            <button
-                class="item"
-                role="menuitem"
-                type="button"
                 @click="openExport('svg')"
             >
                 SVG
@@ -193,7 +185,6 @@ function resolveExportBackground(): ExportBackground {
 
     return form.pngBackground;
 }
-
 function exportJson() {
     const json = canvasStore.exportToJson();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
