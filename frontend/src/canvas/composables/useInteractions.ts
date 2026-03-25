@@ -29,7 +29,7 @@ interface ShapeResizeState {
     startMatrix: DOMMatrix;
     startInverse: DOMMatrix;
     startScale: Point;
-    startRotation: number; 
+    startRotation: number;
     startPosition: Point;
     startLocalEndPoint?: Point;
 }
@@ -60,7 +60,7 @@ export function useInteractions(
     const resizeStartMatrix = ref<DOMMatrix | null>(null);
     const resizeStartInverse = ref<DOMMatrix | null>(null);
     const resizeStartScale = ref<Point>({ x: 1, y: 1 });
-    const resizeStartRotation = ref<number>(0); 
+    const resizeStartRotation = ref<number>(0);
     const lineStartLocal = ref<Point | null>(null);
     const hasRecordedInteraction = ref(false);
     const hasMoved = ref(false);
@@ -528,7 +528,7 @@ export function useInteractions(
                             startMatrix: shape.getMatrix(),
                             startInverse: shape.getInverseMatrix(),
                             startScale: { x: shape.scaleX, y: shape.scaleY },
-                            startRotation: shape.rotation, 
+                            startRotation: shape.rotation,
                             startPosition: {
                                 x: shape.position.x,
                                 y: shape.position.y,
@@ -716,11 +716,17 @@ export function useInteractions(
                 newMaxY = startBox.maxY;
 
             if (forceProportional) {
-                const ratioX = handle.includes('l') ? (startBox.maxX - point.x) / origW :
-                               handle.includes('r') ? (point.x - startBox.minX) / origW : 1;
-                
-                const ratioY = handle.includes('t') ? (startBox.maxY - point.y) / origH :
-                               handle.includes('b') ? (point.y - startBox.minY) / origH : 1;
+                const ratioX = handle.includes('l')
+                    ? (startBox.maxX - point.x) / origW
+                    : handle.includes('r')
+                      ? (point.x - startBox.minX) / origW
+                      : 1;
+
+                const ratioY = handle.includes('t')
+                    ? (startBox.maxY - point.y) / origH
+                    : handle.includes('b')
+                      ? (point.y - startBox.minY) / origH
+                      : 1;
 
                 let ratio = 1;
                 if (['l', 'r'].includes(handle)) {
@@ -731,15 +737,15 @@ export function useInteractions(
                     ratio = Math.max(Math.abs(ratioX), Math.abs(ratioY));
                 }
 
-                ratio = Math.max(0.01, ratio); 
+                ratio = Math.max(0.01, ratio);
 
                 const dirX = Math.sign(ratioX) || 1;
                 const dirY = Math.sign(ratioY) || 1;
 
                 if (handle.includes('l')) {
-                    newMinX = startBox.maxX - (origW * ratio * dirX);
+                    newMinX = startBox.maxX - origW * ratio * dirX;
                 } else if (handle.includes('r')) {
-                    newMaxX = startBox.minX + (origW * ratio * dirX);
+                    newMaxX = startBox.minX + origW * ratio * dirX;
                 } else {
                     const halfW = (origW * ratio) / 2;
                     const cx = (startBox.minX + startBox.maxX) / 2;
@@ -748,16 +754,15 @@ export function useInteractions(
                 }
 
                 if (handle.includes('t')) {
-                    newMinY = startBox.maxY - (origH * ratio * dirY);
+                    newMinY = startBox.maxY - origH * ratio * dirY;
                 } else if (handle.includes('b')) {
-                    newMaxY = startBox.minY + (origH * ratio * dirY);
+                    newMaxY = startBox.minY + origH * ratio * dirY;
                 } else {
                     const halfH = (origH * ratio) / 2;
                     const cy = (startBox.minY + startBox.maxY) / 2;
                     newMinY = cy - halfH;
                     newMaxY = cy + halfH;
                 }
-
             } else {
                 const deltaX = point.x - dragStart.value.x;
                 const deltaY = point.y - dragStart.value.y;
@@ -782,7 +787,7 @@ export function useInteractions(
 
             const newWidth = Math.max(1, newMaxX - newMinX);
             const newHeight = Math.max(1, newMaxY - newMinY);
-            
+
             const absScaleX = newWidth / origW;
             const absScaleY = newHeight / origH;
 
@@ -798,8 +803,8 @@ export function useInteractions(
                 const relX = (state.startPosition.x - oldCenterX) / (origW / 2);
                 const relY = (state.startPosition.y - oldCenterY) / (origH / 2);
 
-                shape.position.x = newCenterX + (relX * signX) * (newWidth / 2);
-                shape.position.y = newCenterY + (relY * signY) * (newHeight / 2);
+                shape.position.x = newCenterX + relX * signX * (newWidth / 2);
+                shape.position.y = newCenterY + relY * signY * (newHeight / 2);
 
                 shape.scaleX = state.startScale.x * signX;
                 shape.scaleY = state.startScale.y * signY;
@@ -816,8 +821,10 @@ export function useInteractions(
                     shape.rotation = newRot;
 
                     const localBox = state.startLocalBox;
-                    const newLocalWidth = (localBox.maxX - localBox.minX) * absScaleX;
-                    const newLocalHeight = (localBox.maxY - localBox.minY) * absScaleY;
+                    const newLocalWidth =
+                        (localBox.maxX - localBox.minX) * absScaleX;
+                    const newLocalHeight =
+                        (localBox.maxY - localBox.minY) * absScaleY;
                     shape.setSize(
                         Math.max(1, newLocalWidth),
                         Math.max(1, newLocalHeight)
@@ -825,8 +832,10 @@ export function useInteractions(
                 } else {
                     const line = shape as LineShape;
                     if (line.localEndPoint && state.startLocalEndPoint) {
-                        line.localEndPoint.x = state.startLocalEndPoint.x * absScaleX;
-                        line.localEndPoint.y = state.startLocalEndPoint.y * absScaleY;
+                        line.localEndPoint.x =
+                            state.startLocalEndPoint.x * absScaleX;
+                        line.localEndPoint.y =
+                            state.startLocalEndPoint.y * absScaleY;
                     }
                 }
             });
@@ -1122,8 +1131,8 @@ export function useInteractions(
 
             if (handle.includes('t') || handle.includes('b')) {
                 const fixedY = handle.includes('t')
-                 ? startBox.maxY
-                 : startBox.minY;
+                    ? startBox.maxY
+                    : startBox.minY;
                 const expectedDir = handle.includes('t') ? -1 : 1;
                 const actualDir = Math.sign(moveY - fixedY) || expectedDir;
                 const signY = actualDir === expectedDir ? 1 : -1;
@@ -1207,9 +1216,9 @@ export function useInteractions(
                 point.y >= expandedBox.minY &&
                 point.y <= expandedBox.maxY;
 
-                if (isInside) {
+            if (isInside) {
                 let cursorHandle: ResizeHandle | null = null;
-                
+
                 if (nearLeft && nearTop) cursorHandle = 'lt';
                 else if (nearRight && nearTop) cursorHandle = 'rt';
                 else if (nearLeft && nearBottom) cursorHandle = 'lb';
@@ -1266,10 +1275,10 @@ export function useInteractions(
 
             if (canvasStore.selectedIds.length === 1) {
                 const singleId = canvasStore.selectedIds[0];
-                
+
                 if (singleId) canvasStore.selectShape(singleId);
 
-                canvasStore.selectionRect = null; 
+                canvasStore.selectionRect = null;
             }
         }
 

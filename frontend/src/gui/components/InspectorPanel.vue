@@ -777,9 +777,10 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
 }
 
 function onFlip(key: 'scaleX' | 'scaleY') {
-    const shapesToFlip = canvasStore.selectedIds.length === 1 && selectedShape.value 
-        ? [selectedShape.value] 
-        : canvasStore.selectedShapes;
+    const shapesToFlip =
+        canvasStore.selectedIds.length === 1 && selectedShape.value
+            ? [selectedShape.value]
+            : canvasStore.selectedShapes;
 
     if (!shapesToFlip || shapesToFlip.length === 0) return;
 
@@ -787,18 +788,24 @@ function onFlip(key: 'scaleX' | 'scaleY') {
     let flipCenterY = 0;
 
     if (canvasStore.selectionRect) {
-        flipCenterX = (canvasStore.selectionRect.start.x + canvasStore.selectionRect.end.x) / 2;
-        flipCenterY = (canvasStore.selectionRect.start.y + canvasStore.selectionRect.end.y) / 2;
+        flipCenterX =
+            (canvasStore.selectionRect.start.x +
+                canvasStore.selectionRect.end.x) /
+            2;
+        flipCenterY =
+            (canvasStore.selectionRect.start.y +
+                canvasStore.selectionRect.end.y) /
+            2;
     } else {
         const targetShape = shapesToFlip[0];
-        if (!targetShape) return; 
+        if (!targetShape) return;
 
         const box = targetShape.getBoundingBox();
         flipCenterX = (box.minX + box.maxX) / 2;
         flipCenterY = (box.minY + box.maxY) / 2;
     }
 
-    shapesToFlip.forEach(shape => {
+    shapesToFlip.forEach((shape) => {
         const currentScaleX = shape.scaleX;
         const currentScaleY = shape.scaleY;
         const currentRotation = shape.rotation;
@@ -824,19 +831,21 @@ function onFlip(key: 'scaleX' | 'scaleY') {
             }
         }
 
-        const newPosX = key === 'scaleX' 
-            ? flipCenterX - (shape.position.x - flipCenterX) 
-            : shape.position.x;
-            
-        const newPosY = key === 'scaleY' 
-            ? flipCenterY - (shape.position.y - flipCenterY) 
-            : shape.position.y;
+        const newPosX =
+            key === 'scaleX'
+                ? flipCenterX - (shape.position.x - flipCenterX)
+                : shape.position.x;
+
+        const newPosY =
+            key === 'scaleY'
+                ? flipCenterY - (shape.position.y - flipCenterY)
+                : shape.position.y;
 
         canvasStore.updateShape(shape.id, {
             scaleX: newScaleX,
             scaleY: newScaleY,
             rotation: newRotation,
-            position: { x: newPosX, y: newPosY }
+            position: { x: newPosX, y: newPosY },
         });
     });
 }
