@@ -777,20 +777,76 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
 }
 
 function onFlip(key: 'scaleX' | 'scaleY') {
-    if (!selectedShape.value) return;
+    const shapesToFlip =
+        canvasStore.selectedIds.length === 1 && selectedShape.value
+            ? [selectedShape.value]
+            : canvasStore.selectedShapes;
 
-    const currentScale = Number((selectedShape.value as Partial<Shape>)[key]);
-    const currentRotation = selectedShape.value.rotation;
+    if (!shapesToFlip || shapesToFlip.length === 0) return;
 
-    const newRotation =
-        key === 'scaleX'
-            ? (360 - currentRotation) % 360
-            : (180 - currentRotation + 360) % 360;
+    let flipCenterX = 0;
+    let flipCenterY = 0;
 
-    canvasStore.updateShape(selectedShape.value.id, {
-        [key]: currentScale * -1,
-        rotation:
-            selectedShape.value.type === 'line' ? currentRotation : newRotation,
+    if (canvasStore.selectionRect) {
+        flipCenterX =
+            (canvasStore.selectionRect.start.x +
+                canvasStore.selectionRect.end.x) /
+            2;
+        flipCenterY =
+            (canvasStore.selectionRect.start.y +
+                canvasStore.selectionRect.end.y) /
+            2;
+    } else {
+        const targetShape = shapesToFlip[0];
+        if (!targetShape) return;
+
+        const box = targetShape.getBoundingBox();
+        flipCenterX = (box.minX + box.maxX) / 2;
+        flipCenterY = (box.minY + box.maxY) / 2;
+    }
+
+    shapesToFlip.forEach((shape) => {
+        const currentScaleX = shape.scaleX;
+        const currentScaleY = shape.scaleY;
+        const currentRotation = shape.rotation;
+        const isLine = shape.type === 'line';
+
+        let newScaleX = currentScaleX;
+        let newScaleY = currentScaleY;
+        let newRotation = currentRotation;
+
+        if (key === 'scaleX') {
+            if (isLine) {
+                newScaleX = currentScaleX * -1;
+            } else {
+                newScaleX = currentScaleX * -1;
+                newRotation = (360 - currentRotation) % 360;
+            }
+        } else {
+            if (isLine) {
+                newScaleY = currentScaleY * -1;
+            } else {
+                newScaleX = currentScaleX * -1;
+                newRotation = (180 - currentRotation + 360) % 360;
+            }
+        }
+
+        const newPosX =
+            key === 'scaleX'
+                ? flipCenterX - (shape.position.x - flipCenterX)
+                : shape.position.x;
+
+        const newPosY =
+            key === 'scaleY'
+                ? flipCenterY - (shape.position.y - flipCenterY)
+                : shape.position.y;
+
+        canvasStore.updateShape(shape.id, {
+            scaleX: newScaleX,
+            scaleY: newScaleY,
+            rotation: newRotation,
+            position: { x: newPosX, y: newPosY },
+        });
     });
 }
 

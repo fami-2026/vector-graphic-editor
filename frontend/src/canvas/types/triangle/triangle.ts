@@ -103,9 +103,10 @@ export class TriangleShape extends BaseShape {
         const halfH = this.height / 2;
 
         const localPoints = [
-            { x: 0, y: -halfH },
-            { x: -halfW, y: halfH },
-            { x: halfW, y: halfH },
+            // { x: -halfW * this.scaleX, y: -halfH * this.scaleY },
+            { x: 0, y: -halfH * this.scaleY },
+            { x: -halfW * this.scaleX, y: halfH * this.scaleY },
+            { x: halfW * this.scaleX, y: halfH * this.scaleY },
         ];
 
         return localPoints.map((p) => ({

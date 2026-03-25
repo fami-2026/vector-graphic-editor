@@ -130,8 +130,8 @@ export class StarShape extends BaseShape {
         const currentH = maxY - minY;
 
         return tempPoints.map((p) => ({
-            x: ((p.x - minX) / currentW - 0.5) * this.width,
-            y: ((p.y - minY) / currentH - 0.5) * this.height,
+            x: ((p.x - minX) / currentW - 0.5) * this.width * this.scaleX,
+            y: ((p.y - minY) / currentH - 0.5) * this.height * this.scaleY,
         }));
     }
 
