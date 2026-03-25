@@ -29,6 +29,7 @@ interface ShapeResizeState {
     startMatrix: DOMMatrix;
     startInverse: DOMMatrix;
     startScale: Point;
+    startRotation: number; 
     startPosition: Point;
     startLocalEndPoint?: Point;
 }
@@ -59,6 +60,7 @@ export function useInteractions(
     const resizeStartMatrix = ref<DOMMatrix | null>(null);
     const resizeStartInverse = ref<DOMMatrix | null>(null);
     const resizeStartScale = ref<Point>({ x: 1, y: 1 });
+    const resizeStartRotation = ref<number>(0); 
     const lineStartLocal = ref<Point | null>(null);
     const hasRecordedInteraction = ref(false);
     const hasMoved = ref(false);
@@ -219,13 +221,13 @@ export function useInteractions(
             maxY: box.maxY + padY,
         };
 
-        const isFlippedY = shape.scaleY < 0;
-        const localAnchorY = isFlippedY ? paddedBox.maxY : paddedBox.minY;
-        const rotOffset = (20 - SELECTION_PADDING) / shape.scaleY;
-        const rotY = localAnchorY - rotOffset;
+        const vLocalPoint = shape.toVLocalPoint(globalPoint);
+        const rawY = Math.min(box.minY * shape.scaleY, box.maxY * shape.scaleY);
+        const rectY = rawY - SELECTION_PADDING;
+        const visualRotY = rectY - 20 + SELECTION_PADDING;
 
-        const diffX = (localPoint.x - 0) * shape.scaleX;
-        const diffY = (localPoint.y - rotY) * shape.scaleY;
+        const diffX = vLocalPoint.x;
+        const diffY = vLocalPoint.y - visualRotY;
         if (Math.hypot(diffX, diffY) <= 8) return 'rot';
 
         const nearLeft = Math.abs(localPoint.x - paddedBox.minX) <= edgeX;
@@ -249,6 +251,20 @@ export function useInteractions(
         if (nearBottom && inX) return 'b';
 
         return null;
+    }
+
+    function getGlobalCursorStyle(handle: string): string {
+        const map: Record<string, string> = {
+            t: 'ns-resize',
+            b: 'ns-resize',
+            l: 'ew-resize',
+            r: 'ew-resize',
+            lt: 'nwse-resize',
+            rb: 'nwse-resize',
+            rt: 'nesw-resize',
+            lb: 'nesw-resize',
+        };
+        return map[handle] ?? 'default';
     }
 
     function getCursorStyle(handle: string, shape: Shape): string {
@@ -512,6 +528,7 @@ export function useInteractions(
                             startMatrix: shape.getMatrix(),
                             startInverse: shape.getInverseMatrix(),
                             startScale: { x: shape.scaleX, y: shape.scaleY },
+                            startRotation: shape.rotation, 
                             startPosition: {
                                 x: shape.position.x,
                                 y: shape.position.y,
@@ -527,13 +544,7 @@ export function useInteractions(
                     dragStart.value = point;
 
                     if (canvas) {
-                        const firstShape = canvasStore.selectedShapes[0];
-                        if (firstShape) {
-                            canvas.style.cursor = getCursorStyle(
-                                handle,
-                                firstShape
-                            );
-                        }
+                        canvas.style.cursor = getGlobalCursorStyle(handle);
                     }
                     return;
                 }
@@ -687,41 +698,93 @@ export function useInteractions(
             const shift = e.shiftKey;
             const startBox = selectionStartBox.value;
 
+            const origW = Math.max(0.1, startBox.maxX - startBox.minX);
+            const origH = Math.max(0.1, startBox.maxY - startBox.minY);
+
+            let hasRotated = false;
+            multiResizeStates.value.forEach((state) => {
+                if (Math.abs(state.shape.rotation % 180) > 0) {
+                    hasRotated = true;
+                }
+            });
+
+            const forceProportional = shift || hasRotated;
+
             let newMinX = startBox.minX,
                 newMaxX = startBox.maxX;
             let newMinY = startBox.minY,
                 newMaxY = startBox.maxY;
 
-            const deltaX = point.x - dragStart.value.x;
-            const deltaY = point.y - dragStart.value.y;
+            if (forceProportional) {
+                const ratioX = handle.includes('l') ? (startBox.maxX - point.x) / origW :
+                               handle.includes('r') ? (point.x - startBox.minX) / origW : 1;
+                
+                const ratioY = handle.includes('t') ? (startBox.maxY - point.y) / origH :
+                               handle.includes('b') ? (point.y - startBox.minY) / origH : 1;
 
-            if (handle.includes('l')) newMinX = startBox.minX + deltaX;
-            if (handle.includes('r')) newMaxX = startBox.maxX + deltaX;
-            if (handle.includes('t')) newMinY = startBox.minY + deltaY;
-            if (handle.includes('b')) newMaxY = startBox.maxY + deltaY;
+                let ratio = 1;
+                if (['l', 'r'].includes(handle)) {
+                    ratio = Math.abs(ratioX);
+                } else if (['t', 'b'].includes(handle)) {
+                    ratio = Math.abs(ratioY);
+                } else {
+                    ratio = Math.max(Math.abs(ratioX), Math.abs(ratioY));
+                }
 
-            if (newMinX > newMaxX) [newMinX, newMaxX] = [newMaxX, newMinX];
-            if (newMinY > newMaxY) [newMinY, newMaxY] = [newMaxY, newMinY];
+                ratio = Math.max(0.01, ratio); 
 
-            if (shift && ['lt', 'rt', 'lb', 'rb'].includes(handle)) {
-                const width = newMaxX - newMinX;
-                const height = newMaxY - newMinY;
-                const size = Math.max(width, height);
+                const dirX = Math.sign(ratioX) || 1;
+                const dirY = Math.sign(ratioY) || 1;
 
-                if (handle.includes('l')) newMinX = newMaxX - size;
-                else if (handle.includes('r')) newMaxX = newMinX + size;
+                if (handle.includes('l')) {
+                    newMinX = startBox.maxX - (origW * ratio * dirX);
+                } else if (handle.includes('r')) {
+                    newMaxX = startBox.minX + (origW * ratio * dirX);
+                } else {
+                    const halfW = (origW * ratio) / 2;
+                    const cx = (startBox.minX + startBox.maxX) / 2;
+                    newMinX = cx - halfW;
+                    newMaxX = cx + halfW;
+                }
 
-                if (handle.includes('t')) newMinY = newMaxY - size;
-                else if (handle.includes('b')) newMaxY = newMinY + size;
+                if (handle.includes('t')) {
+                    newMinY = startBox.maxY - (origH * ratio * dirY);
+                } else if (handle.includes('b')) {
+                    newMaxY = startBox.minY + (origH * ratio * dirY);
+                } else {
+                    const halfH = (origH * ratio) / 2;
+                    const cy = (startBox.minY + startBox.maxY) / 2;
+                    newMinY = cy - halfH;
+                    newMaxY = cy + halfH;
+                }
+
+            } else {
+                const deltaX = point.x - dragStart.value.x;
+                const deltaY = point.y - dragStart.value.y;
+
+                if (handle.includes('l')) newMinX = startBox.minX + deltaX;
+                if (handle.includes('r')) newMaxX = startBox.maxX + deltaX;
+                if (handle.includes('t')) newMinY = startBox.minY + deltaY;
+                if (handle.includes('b')) newMaxY = startBox.maxY + deltaY;
+            }
+
+            let signX = 1;
+            let signY = 1;
+
+            if (newMinX > newMaxX) {
+                signX = -1;
+                [newMinX, newMaxX] = [newMaxX, newMinX];
+            }
+            if (newMinY > newMaxY) {
+                signY = -1;
+                [newMinY, newMaxY] = [newMaxY, newMinY];
             }
 
             const newWidth = Math.max(1, newMaxX - newMinX);
             const newHeight = Math.max(1, newMaxY - newMinY);
-            const oldWidth = Math.max(1, startBox.maxX - startBox.minX);
-            const oldHeight = Math.max(1, startBox.maxY - startBox.minY);
-
-            const scaleX = newWidth / oldWidth;
-            const scaleY = newHeight / oldHeight;
+            
+            const absScaleX = newWidth / origW;
+            const absScaleY = newHeight / origH;
 
             multiResizeStates.value.forEach((state) => {
                 const shape = state.shape;
@@ -732,25 +795,29 @@ export function useInteractions(
                 const newCenterX = (newMinX + newMaxX) / 2;
                 const newCenterY = (newMinY + newMaxY) / 2;
 
-                const relX =
-                    oldWidth === 0
-                        ? 0
-                        : (state.startPosition.x - oldCenterX) / (oldWidth / 2);
-                const relY =
-                    oldHeight === 0
-                        ? 0
-                        : (state.startPosition.y - oldCenterY) /
-                          (oldHeight / 2);
+                const relX = (state.startPosition.x - oldCenterX) / (origW / 2);
+                const relY = (state.startPosition.y - oldCenterY) / (origH / 2);
 
-                shape.position.x = newCenterX + relX * (newWidth / 2);
-                shape.position.y = newCenterY + relY * (newHeight / 2);
+                shape.position.x = newCenterX + (relX * signX) * (newWidth / 2);
+                shape.position.y = newCenterY + (relY * signY) * (newHeight / 2);
+
+                shape.scaleX = state.startScale.x * signX;
+                shape.scaleY = state.startScale.y * signY;
 
                 if (shape.type !== 'line') {
+                    let newRot = state.startRotation;
+
+                    if (signX === -1) {
+                        newRot = (360 - newRot) % 360;
+                    }
+                    if (signY === -1) {
+                        newRot = (360 - newRot) % 360;
+                    }
+                    shape.rotation = newRot;
+
                     const localBox = state.startLocalBox;
-                    const newLocalWidth =
-                        (localBox.maxX - localBox.minX) * scaleX;
-                    const newLocalHeight =
-                        (localBox.maxY - localBox.minY) * scaleY;
+                    const newLocalWidth = (localBox.maxX - localBox.minX) * absScaleX;
+                    const newLocalHeight = (localBox.maxY - localBox.minY) * absScaleY;
                     shape.setSize(
                         Math.max(1, newLocalWidth),
                         Math.max(1, newLocalHeight)
@@ -758,10 +825,8 @@ export function useInteractions(
                 } else {
                     const line = shape as LineShape;
                     if (line.localEndPoint && state.startLocalEndPoint) {
-                        line.localEndPoint.x =
-                            state.startLocalEndPoint.x * scaleX;
-                        line.localEndPoint.y =
-                            state.startLocalEndPoint.y * scaleY;
+                        line.localEndPoint.x = state.startLocalEndPoint.x * absScaleX;
+                        line.localEndPoint.y = state.startLocalEndPoint.y * absScaleY;
                     }
                 }
             });
@@ -771,13 +836,7 @@ export function useInteractions(
                 canvasStore.selectionRect.end = { x: newMaxX, y: newMaxY };
             }
 
-            const firstSelectedShape = canvasStore.selectedShapes[0];
-            if (firstSelectedShape) {
-                canvas.style.cursor = getCursorStyle(
-                    handle,
-                    firstSelectedShape
-                );
-            }
+            canvas.style.cursor = getGlobalCursorStyle(handle);
             return;
         }
 
@@ -1057,18 +1116,18 @@ export function useInteractions(
                     : startBox.minX;
                 const expectedDir = handle.includes('l') ? -1 : 1;
                 const actualDir = Math.sign(moveX - fixedX) || expectedDir;
-                const sign = actualDir === expectedDir ? 1 : -1;
-                activeShape.value.scaleX = startScaleX * sign;
+                const signX = actualDir === expectedDir ? 1 : -1;
+                activeShape.value.scaleX = startScaleX * signX;
             }
 
             if (handle.includes('t') || handle.includes('b')) {
                 const fixedY = handle.includes('t')
-                    ? startBox.maxY
-                    : startBox.minY;
+                 ? startBox.maxY
+                 : startBox.minY;
                 const expectedDir = handle.includes('t') ? -1 : 1;
                 const actualDir = Math.sign(moveY - fixedY) || expectedDir;
-                const sign = actualDir === expectedDir ? 1 : -1;
-                activeShape.value.scaleY = startScaleY * sign;
+                const signY = actualDir === expectedDir ? 1 : -1;
+                activeShape.value.scaleY = startScaleY * signY;
             }
 
             canvas.style.cursor = getCursorStyle(handle, activeShape.value);
@@ -1148,63 +1207,21 @@ export function useInteractions(
                 point.y >= expandedBox.minY &&
                 point.y <= expandedBox.maxY;
 
-            if (isInside) {
-                if (nearLeft && nearTop) {
-                    const firstShape = canvasStore.selectedShapes[0];
-                    if (firstShape) {
-                        canvas.style.cursor = getCursorStyle('lt', firstShape);
-                        return;
-                    }
-                }
-                if (nearRight && nearTop) {
-                    const firstShape = canvasStore.selectedShapes[0];
-                    if (firstShape) {
-                        canvas.style.cursor = getCursorStyle('rt', firstShape);
-                        return;
-                    }
-                }
-                if (nearLeft && nearBottom) {
-                    const firstShape = canvasStore.selectedShapes[0];
-                    if (firstShape) {
-                        canvas.style.cursor = getCursorStyle('lb', firstShape);
-                        return;
-                    }
-                }
-                if (nearRight && nearBottom) {
-                    const firstShape = canvasStore.selectedShapes[0];
-                    if (firstShape) {
-                        canvas.style.cursor = getCursorStyle('rb', firstShape);
-                        return;
-                    }
-                }
+                if (isInside) {
+                let cursorHandle: ResizeHandle | null = null;
+                
+                if (nearLeft && nearTop) cursorHandle = 'lt';
+                else if (nearRight && nearTop) cursorHandle = 'rt';
+                else if (nearLeft && nearBottom) cursorHandle = 'lb';
+                else if (nearRight && nearBottom) cursorHandle = 'rb';
+                else if (nearLeft && inY) cursorHandle = 'l';
+                else if (nearRight && inY) cursorHandle = 'r';
+                else if (nearTop && inX) cursorHandle = 't';
+                else if (nearBottom && inX) cursorHandle = 'b';
 
-                if (nearLeft && inY) {
-                    const firstShape = canvasStore.selectedShapes[0];
-                    if (firstShape) {
-                        canvas.style.cursor = getCursorStyle('l', firstShape);
-                        return;
-                    }
-                }
-                if (nearRight && inY) {
-                    const firstShape = canvasStore.selectedShapes[0];
-                    if (firstShape) {
-                        canvas.style.cursor = getCursorStyle('r', firstShape);
-                        return;
-                    }
-                }
-                if (nearTop && inX) {
-                    const firstShape = canvasStore.selectedShapes[0];
-                    if (firstShape) {
-                        canvas.style.cursor = getCursorStyle('t', firstShape);
-                        return;
-                    }
-                }
-                if (nearBottom && inX) {
-                    const firstShape = canvasStore.selectedShapes[0];
-                    if (firstShape) {
-                        canvas.style.cursor = getCursorStyle('b', firstShape);
-                        return;
-                    }
+                if (cursorHandle) {
+                    canvas.style.cursor = getGlobalCursorStyle(cursorHandle);
+                    return;
                 }
 
                 canvas.style.cursor = 'grab';
@@ -1246,6 +1263,14 @@ export function useInteractions(
 
         if (canvasStore.isSelecting) {
             canvasStore.endSelection();
+
+            if (canvasStore.selectedIds.length === 1) {
+                const singleId = canvasStore.selectedIds[0];
+                
+                if (singleId) canvasStore.selectShape(singleId);
+
+                canvasStore.selectionRect = null; 
+            }
         }
 
         if (hasMoved.value) {
@@ -1314,6 +1339,7 @@ export function useInteractions(
         resizeStartLocalBox.value = null;
         resizeStartMatrix.value = null;
         resizeStartInverse.value = null;
+        resizeStartRotation.value = 0;
         lineStartLocal.value = null;
 
         onMouseMove(e);

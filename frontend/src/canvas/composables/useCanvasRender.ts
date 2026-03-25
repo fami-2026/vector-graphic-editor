@@ -137,7 +137,7 @@ export function useCanvasRender(
         if (
             canvasStore.selectionRect &&
             !canvasStore.isSelecting &&
-            canvasStore.selectedIds.length > 0
+            canvasStore.selectedIds.length > 1
         ) {
             const rect = {
                 x: Math.min(
