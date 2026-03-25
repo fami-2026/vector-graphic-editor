@@ -27,10 +27,10 @@ jobs:
       - name: Build Images
         env:
           SERVER_ADDR: ${{ vars.SERVER_ADDR }}
-        run: task image
+        run: task server:image
 
       - name: Publish Images
-        run: task publish
+        run: task server:publish
 
   cloud-deploy:
     needs: cloud-build
@@ -45,7 +45,7 @@ jobs:
         uses: go-task/setup-task@v1
 
       - name: Deploy
-        run: task deploy
+        run: task server:deploy
         env:
           ORIGIN: ${{ vars.ORIGIN }}
           MONGO_USER: ${{ secrets.MONGO_USER }}
