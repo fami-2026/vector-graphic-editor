@@ -140,7 +140,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
         clipboardShape.value = serializeShape(newShape as Shape);
     }
-
     function duplicateSelectedShape() {
         if (!selectedShape.value) return;
 
@@ -173,7 +172,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         shapes.value.push(newShape as Shape);
         selectedId.value = newId;
     }
-
     function serializeShape(shape: Shape): SerializedShape {
         const plain = JSON.parse(JSON.stringify(shape)) as SerializedShape;
         plain.type = (shape as unknown as { type: string }).type;

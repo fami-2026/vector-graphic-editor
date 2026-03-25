@@ -39,7 +39,6 @@
             </div>
 
             <HotkeysHelp />
-
         </div>
     </div>
 </template>
@@ -59,7 +58,6 @@ const canvasStore = useCanvasStore();
 const toolsStore = useToolsStore();
 const isInspectorOpen = ref(true);
 const isFocusMode = ref(false);
-
 
 function isEditableElement(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -194,7 +192,6 @@ onUnmounted(() => {
     background: #ffffff;
     overflow: hidden;
 }
-
 
 .canvasRoot {
     position: absolute;
