@@ -31,7 +31,12 @@ let animationFrameId: number | null = null;
 function isEditableElement(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
     const tag = target.tagName;
-    return (target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT');
+    return (
+        target.isContentEditable ||
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT'
+    );
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
