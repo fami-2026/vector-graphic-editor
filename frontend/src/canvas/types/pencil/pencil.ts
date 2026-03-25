@@ -119,8 +119,8 @@ export class PencilShape extends BaseShape {
         const cy = (box.minY + box.maxY) / 2;
 
         this.points = this.points.map((p) => ({
-            x: (p.x - cx) * sx,
-            y: (p.y - cy) * sy,
+            x: cx + (p.x - cx) * sx,
+            y: cy + (p.y - cy) * sy,
         }));
     }
 
@@ -193,15 +193,7 @@ export class PencilShape extends BaseShape {
     // }
 
     getLocalBox(): BoundingBox {
-        const box = this.getStrokeBounds();
-        const padding = this.strokeWidth / 2 + 2;
-
-        return {
-            minX: box.minX - padding,
-            minY: box.minY - padding,
-            maxX: box.maxX + padding,
-            maxY: box.maxY + padding,
-        };
+        return this.getStrokeBounds();
     }
 
     getBoundingBox(): BoundingBox {
@@ -212,11 +204,14 @@ export class PencilShape extends BaseShape {
             this.toGlobalPoint({ x: localBox.maxX, y: localBox.maxY }),
             this.toGlobalPoint({ x: localBox.minX, y: localBox.maxY }),
         ];
+        
+        const padding = this.strokeWidth / 2 + 5;
+        
         return {
-            minX: Math.min(...corners.map((p) => p.x)),
-            minY: Math.min(...corners.map((p) => p.y)),
-            maxX: Math.max(...corners.map((p) => p.x)),
-            maxY: Math.max(...corners.map((p) => p.y)),
+            minX: Math.min(...corners.map((p) => p.x)) - padding,
+            minY: Math.min(...corners.map((p) => p.y)) - padding,
+            maxX: Math.max(...corners.map((p) => p.x)) + padding,
+            maxY: Math.max(...corners.map((p) => p.y)) + padding,
         };
     }
 
