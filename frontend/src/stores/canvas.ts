@@ -85,6 +85,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const isOfflineMode = ref(false);
     const serverError = ref<string | null>(null);
     const backgroundColor = ref<string>('#ffffff');
+    const clipboardShape = ref<SerializedShape | null>(null);
 
     let isContinuousChangeActive = false;
     let continuousChangeTimer: number | null = null;
@@ -99,6 +100,79 @@ export const useCanvasStore = defineStore('canvas', () => {
     const selectedShape = computed(
         () => shapes.value.find((s) => s.id === selectedId.value) ?? null
     );
+
+    function copySelectedShape() {
+        if (!selectedShape.value) return;
+        clipboardShape.value = serializeShape(selectedShape.value);
+    }
+
+    function pasteShape() {
+        if (!clipboardShape.value) return;
+
+        pushHistory();
+
+        const plain = clipboardShape.value;
+        const { type, id: _oldId, position, ...rest } = plain;
+
+        const newId = generateId();
+        const newPosition = {
+            x: position.x + 20,
+            y: position.y + 20,
+        };
+
+        const newShape = shapeRegistry.create(type, newId, newPosition);
+        Object.assign(newShape, rest);
+
+        newShape.id = newId;
+        newShape.position = newPosition;
+
+        if ('name' in newShape) {
+            const sourceName =
+                typeof (plain as Record<string, unknown>).name === 'string'
+                    ? String((plain as Record<string, unknown>).name)
+                    : type;
+
+            (newShape as Shape).name = `${sourceName} копия`;
+        }
+
+        shapes.value.push(newShape as Shape);
+        selectedId.value = newId;
+
+        clipboardShape.value = serializeShape(newShape as Shape);
+    }
+
+    function duplicateSelectedShape() {
+        if (!selectedShape.value) return;
+
+        pushHistory();
+
+        const plain = serializeShape(selectedShape.value);
+        const { type, id: _oldId, position, ...rest } = plain;
+
+        const newId = generateId();
+        const newPosition = {
+            x: position.x + 20,
+            y: position.y + 20,
+        };
+
+        const newShape = shapeRegistry.create(type, newId, newPosition);
+        Object.assign(newShape, rest);
+
+        newShape.id = newId;
+        newShape.position = newPosition;
+
+        if ('name' in newShape) {
+            const baseName =
+                typeof (plain as Record<string, unknown>).name === 'string'
+                    ? String((plain as Record<string, unknown>).name)
+                    : type;
+
+            (newShape as Shape).name = `${baseName} копия`;
+        }
+
+        shapes.value.push(newShape as Shape);
+        selectedId.value = newId;
+    }
 
     function serializeShape(shape: Shape): SerializedShape {
         const plain = JSON.parse(JSON.stringify(shape)) as SerializedShape;
@@ -478,40 +552,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         shapes.value = next;
     }
 
-    function duplicateSelectedShape() {
-        const source = selectedShape.value;
-        if (!source) return;
-
-        pushHistory();
-
-        const plain = serializeShape(source);
-        const { type, id: _oldId, position, ...rest } = plain;
-
-        const newId = generateId();
-
-        const duplicate = shapeRegistry.create(type, newId, {
-            x: position.x + 5,
-            y: position.y + 5,
-        });
-
-        Object.assign(duplicate, rest);
-
-        duplicate.id = newId;
-        duplicate.position = {
-            x: duplicate.position.x + 5,
-            y: duplicate.position.y + 5,
-        };
-
-        const sourceName = (source as Shape & { name?: string }).name;
-        if (sourceName && sourceName.trim()) {
-            (duplicate as Shape & { name?: string }).name =
-                `${sourceName} копия`;
-        }
-
-        shapes.value.push(duplicate as Shape);
-        selectedId.value = newId;
-    }
-
     function setZoom(value: number) {
         const newZoom = Math.max(
             MIN_ZOOM,
@@ -863,6 +903,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         clearSelection,
         moveShape,
         duplicateSelectedShape,
+        copySelectedShape,
+        pasteShape,
         undo,
         redo,
         canUndo,

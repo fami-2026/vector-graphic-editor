@@ -37,6 +37,9 @@
             <div v-show="!isFocusMode" class="bottomLeft">
                 <BottomLeftControls />
             </div>
+
+            <HotkeysHelp />
+
         </div>
     </div>
 </template>
@@ -50,11 +53,13 @@ import BottomLeftControls from './BottomLeftControls.vue';
 import VectorCanvas from '@/canvas/components/VectorCanvas.vue';
 import { useCanvasStore } from '@/stores/canvas';
 import { useToolsStore } from '@/stores/tools';
+import HotkeysHelp from './HotkeysHelp.vue';
 
 const canvasStore = useCanvasStore();
 const toolsStore = useToolsStore();
 const isInspectorOpen = ref(true);
 const isFocusMode = ref(false);
+
 
 function isEditableElement(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -131,6 +136,7 @@ function handleKeydown(e: KeyboardEvent) {
             e.preventDefault();
             canvasStore.zoomOut();
         }
+
         return;
     }
 
@@ -145,6 +151,24 @@ function handleKeydown(e: KeyboardEvent) {
     } else if (e.code === 'KeyY') {
         e.preventDefault();
         if (canvasStore.canRedo) canvasStore.redo();
+    }
+
+    if (e.code === 'KeyD') {
+        e.preventDefault();
+        canvasStore.duplicateSelectedShape();
+        return;
+    }
+
+    if (e.code === 'KeyC') {
+        e.preventDefault();
+        canvasStore.copySelectedShape();
+        return;
+    }
+
+    if (e.code === 'KeyV') {
+        e.preventDefault();
+        canvasStore.pasteShape();
+        return;
     }
 }
 
@@ -170,6 +194,7 @@ onUnmounted(() => {
     background: #ffffff;
     overflow: hidden;
 }
+
 
 .canvasRoot {
     position: absolute;
