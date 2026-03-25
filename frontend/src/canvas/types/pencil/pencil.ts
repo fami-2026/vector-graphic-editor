@@ -204,9 +204,9 @@ export class PencilShape extends BaseShape {
             this.toGlobalPoint({ x: localBox.maxX, y: localBox.maxY }),
             this.toGlobalPoint({ x: localBox.minX, y: localBox.maxY }),
         ];
-        
+
         const padding = this.strokeWidth / 2 + 5;
-        
+
         return {
             minX: Math.min(...corners.map((p) => p.x)) - padding,
             minY: Math.min(...corners.map((p) => p.y)) - padding,
