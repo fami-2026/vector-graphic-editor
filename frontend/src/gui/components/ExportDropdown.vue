@@ -83,6 +83,7 @@
                 <select v-model="form.pngBackground">
                     <option value="transparent">Прозрачный</option>
                     <option value="white">Белый</option>
+                    <option value="current">Текущий</option>
                 </select>
             </label>
 
@@ -121,18 +122,20 @@ import {
     type PngScale,
 } from '@/canvas/utils/export';
 
+type ExportBackgroundMode = 'transparent' | 'white' | 'current';
+
 const open = ref(false);
 const showExport = ref(false);
 const root = ref<HTMLElement | null>(null);
 const canvasStore = useCanvasStore();
-const { shapes, selectedId } = storeToRefs(canvasStore);
+const { shapes, selectedId, backgroundColor } = storeToRefs(canvasStore);
 
 const form = reactive<{
     fileName: string;
     format: ExportFormat;
     area: ExportArea;
     pngScale: PngScale;
-    pngBackground: ExportBackground;
+    pngBackground: ExportBackgroundMode;
 }>({
     fileName: 'vector-export',
     format: 'png',
@@ -183,6 +186,14 @@ function normalizeFileName() {
     form.fileName = sanitizeFileName(form.fileName);
 }
 
+function resolveExportBackground(): ExportBackground {
+    if (form.pngBackground === 'current') {
+        return backgroundColor.value || '#ffffff';
+    }
+
+    return form.pngBackground;
+}
+
 function exportJson() {
     const json = canvasStore.exportToJson();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -211,7 +222,7 @@ async function submitExport() {
             sceneSize: getSceneSize(),
             selectedId: selectedId.value,
             pngScale: form.pngScale,
-            background: form.pngBackground,
+            background: resolveExportBackground(),
         });
 
         closeExport();

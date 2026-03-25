@@ -3,7 +3,7 @@ import type { Shape, Point } from '@/canvas/types';
 export type ExportFormat = 'png' | 'svg';
 export type ExportArea = 'scene';
 export type PngScale = 1 | 2 | 3;
-export type ExportBackground = 'transparent' | 'white';
+export type ExportBackground = 'transparent' | 'white' | string;
 
 export interface ExportSceneSize {
     width: number;
@@ -95,6 +95,18 @@ function resolveExportTarget(options: ExportOptions): ExportTarget | null {
     };
 }
 
+function resolveBackgroundFill(background: ExportBackground): string | null {
+    if (background === 'transparent') {
+        return null;
+    }
+
+    if (background === 'white') {
+        return '#ffffff';
+    }
+
+    return background;
+}
+
 async function exportPng(
     target: ExportTarget,
     fileName: string,
@@ -102,6 +114,7 @@ async function exportPng(
 ): Promise<void> {
     const scale = options.pngScale ?? 1;
     const background = options.background ?? 'transparent';
+    const backgroundFill = resolveBackgroundFill(background);
 
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(target.bounds.width * scale));
@@ -116,8 +129,8 @@ async function exportPng(
 
     ctx.scale(scale, scale);
 
-    if (background === 'white') {
-        ctx.fillStyle = '#ffffff';
+    if (backgroundFill) {
+        ctx.fillStyle = backgroundFill;
         ctx.fillRect(0, 0, target.bounds.width, target.bounds.height);
     }
 
@@ -139,6 +152,7 @@ async function exportSvg(
     options: ExportOptions
 ): Promise<void> {
     const background = options.background ?? 'transparent';
+    //const backgroundFill = resolveBackgroundFill(background);
     const { width, height } = target.bounds;
 
     const svgParts: string[] = [
@@ -146,11 +160,17 @@ async function exportSvg(
         `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
     ];
 
-    if (background === 'white') {
+    if (background !== 'transparent') {
         svgParts.push(
-            `  <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"/>`
+            `  <rect x="0" y="0" width="${width}" height="${height}" fill="${background === 'white' ? '#ffffff' : background}"/>`
         );
     }
+
+    // if (backgroundFill) {
+    //     svgParts.push(
+    //         `  <rect x="0" y="0" width="${width}" height="${height}" fill="${backgroundFill}"/>`
+    //     );
+    // }
 
     svgParts.push(
         `  <g transform="translate(${-target.bounds.x}, ${-target.bounds.y})">`
