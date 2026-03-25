@@ -469,6 +469,40 @@ export const useCanvasStore = defineStore('canvas', () => {
         shapes.value = next;
     }
 
+    function duplicateSelectedShape() {
+        const source = selectedShape.value;
+        if (!source) return;
+
+        pushHistory();
+
+        const plain = serializeShape(source);
+        const { type, id: _oldId, position, ...rest } = plain;
+
+        const newId = generateId();
+
+        const duplicate = shapeRegistry.create(type, newId, {
+            x: position.x + 5,
+            y: position.y + 5,
+        });
+
+        Object.assign(duplicate, rest);
+
+        duplicate.id = newId;
+        duplicate.position = {
+            x: duplicate.position.x + 5,
+            y: duplicate.position.y + 5,
+        };
+
+        const sourceName = (source as Shape & { name?: string }).name;
+        if (sourceName && sourceName.trim()) {
+            (duplicate as Shape & { name?: string }).name =
+                `${sourceName} копия`;
+        }
+
+        shapes.value.push(duplicate as Shape);
+        selectedId.value = newId;
+    }
+
     function setZoom(value: number) {
         const newZoom = Math.max(
             MIN_ZOOM,
@@ -819,6 +853,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         selectAll,
         clearSelection,
         moveShape,
+        duplicateSelectedShape,
         undo,
         redo,
         canUndo,
