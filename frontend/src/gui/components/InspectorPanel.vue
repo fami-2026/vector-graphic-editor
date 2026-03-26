@@ -114,6 +114,60 @@
             </div>
         </div>
 
+        <div v-if="selectedShape?.type !== 'line'" class="fieldBlock">
+            <div class="fieldLabel">Наклон</div>
+            <div class="grid2">
+                <input
+                    class="fieldInput"
+                    type="number"
+                    aria-label="Skew X"
+                    :value="selectedShape?.skewX ?? ''"
+                    :disabled="!selectedShape"
+                    min="-89"
+                    max="89"
+                    @blur="onNumberChange('skewX', $event)"
+                    @keydown.enter.prevent="onNumberEnter('skewX', $event)"
+                    @wheel.prevent="onWheelChange('skewX', $event)"
+                />
+                <input
+                    class="fieldInput"
+                    type="number"
+                    aria-label="Skew Y"
+                    :value="selectedShape?.skewY ?? ''"
+                    :disabled="!selectedShape"
+                    min="-89"
+                    max="89"
+                    @blur="onNumberChange('skewY', $event)"
+                    @keydown.enter.prevent="onNumberEnter('skewY', $event)"
+                    @wheel.prevent="onWheelChange('skewY', $event)"
+                />
+            </div>
+            <div class="grid2">
+                <input
+                    class="opacitySlider"
+                    type="range"
+                    aria-label="Skew X slider"
+                    :value="selectedShape?.skewX ?? 0"
+                    :disabled="!selectedShape"
+                    min="-89"
+                    max="89"
+                    step="0.1"
+                    @input="onNumberChange('skewX', $event)"
+                />
+                <input
+                    class="opacitySlider"
+                    type="range"
+                    aria-label="Skew Y slider"
+                    :value="selectedShape?.skewY ?? 0"
+                    :disabled="!selectedShape"
+                    min="-89"
+                    max="89"
+                    step="0.1"
+                    @input="onNumberChange('skewY', $event)"
+                />
+            </div>
+        </div>
+
         <div class="divider" />
 
         <!-- Фигура -->
@@ -679,6 +733,8 @@ const wheelStepConfig: Record<NumberFieldKey, number> = {
     width: 1,
     height: 1,
     rotation: 5,
+    skewX: 1,
+    skewY: 1,
     strokeWidth: 0.5,
     scaleX: 0.1,
     scaleY: 0.1,
@@ -690,6 +746,8 @@ type NumberFieldKey =
     | 'width'
     | 'height'
     | 'rotation'
+    | 'skewX'
+    | 'skewY'
     | 'strokeWidth'
     | 'scaleX'
     | 'scaleY';
@@ -711,6 +769,9 @@ function normalizeNumberByKey(key: NumberFieldKey, value: number) {
     }
     if (key === 'rotation') {
         return ((value % 360) + 360) % 360;
+    }
+    if (key === 'skewX' || key === 'skewY') {
+        return Math.min(89, Math.max(-89, value));
     }
     return value;
 }
@@ -778,6 +839,8 @@ function commitAfterClick(event: MouseEvent) {
         Width: 'width',
         Height: 'height',
         Rotation: 'rotation',
+        'Skew X': 'skewX',
+        'Skew Y': 'skewY',
         'Stroke width': 'strokeWidth',
     };
     const ariaLabel = activeElement.getAttribute('aria-label') ?? '';
@@ -818,6 +881,9 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
     }
     if (key === 'rotation') {
         newValue = ((newValue % 360) + 360) % 360;
+    }
+    if (key === 'skewX' || key === 'skewY') {
+        newValue = Math.min(89, Math.max(-89, newValue));
     }
     if (key === 'strokeWidth') {
         newValue = Math.min(MAX_STROKE_WIDTH, Math.max(1, newValue));

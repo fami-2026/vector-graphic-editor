@@ -306,6 +306,12 @@ function buildSvgTransform(shape: Shape): string {
     if (rotation !== 0) {
         transforms.push(`rotate(${rotation})`);
     }
+    if (shape.type !== 'line' && shape.skewX !== 0) {
+        transforms.push(`skewX(${shape.skewX})`);
+    }
+    if (shape.type !== 'line' && shape.skewY !== 0) {
+        transforms.push(`skewY(${shape.skewY})`);
+    }
     if (shape.scaleX !== 1 || shape.scaleY !== 1) {
         transforms.push(`scale(${shape.scaleX}, ${shape.scaleY})`);
     }

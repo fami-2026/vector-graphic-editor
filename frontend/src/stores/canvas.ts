@@ -32,6 +32,8 @@ type SerializedShapeBase = {
     rotation: number;
     scaleX: number;
     scaleY: number;
+    skewX: number;
+    skewY: number;
 };
 
 type SerializedShape = SerializedShapeBase & Record<string, unknown>;
@@ -183,6 +185,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         plain.rotation = shape.rotation;
         plain.scaleX = shape.scaleX;
         plain.scaleY = shape.scaleY;
+        plain.skewX = shape.skewX;
+        plain.skewY = shape.skewY;
         return plain;
     }
 

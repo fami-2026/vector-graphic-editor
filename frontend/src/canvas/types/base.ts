@@ -13,6 +13,7 @@ export interface BoundingBox {
 }
 
 export const MIN_ABS_SCALE = 0.01;
+const MAX_ABS_SKEW_DEG = 89;
 
 export const SELECTION_PADDING = 4;
 /**
@@ -46,6 +47,8 @@ export abstract class BaseShape {
 
     _scaleX: number = 1;
     _scaleY: number = 1;
+    _skewX: number = 0;
+    _skewY: number = 0;
 
     /**
      * Масштабирование может быть использовано для изменения размера групп и отражений
@@ -69,12 +72,37 @@ export abstract class BaseShape {
         this._scaleY = this.processScaleUpdate(v, this._scaleY);
     }
 
+    get skewX(): number {
+        return this._skewX;
+    }
+
+    set skewX(v: number) {
+        this._skewX = this.processSkewUpdate(v);
+    }
+
+    get skewY(): number {
+        return this._skewY;
+    }
+
+    set skewY(v: number) {
+        this._skewY = this.processSkewUpdate(v);
+    }
+
     processScaleUpdate(newValue: number, oldValue: number): number {
         if (!Number.isFinite(newValue)) return 1;
         if (Math.abs(newValue) < 0.05) {
             return newValue < oldValue ? -MIN_ABS_SCALE : MIN_ABS_SCALE;
         }
         return Math.round(newValue * 10) / 10;
+    }
+
+    processSkewUpdate(newValue: number): number {
+        if (!Number.isFinite(newValue)) return 0;
+        const clamped = Math.min(
+            MAX_ABS_SKEW_DEG,
+            Math.max(-MAX_ABS_SKEW_DEG, newValue)
+        );
+        return Math.round(clamped * 10) / 10;
     }
 
     /**
@@ -112,6 +140,8 @@ export abstract class BaseShape {
         const m = new DOMMatrix();
         m.translateSelf(this.position.x, this.position.y);
         m.rotateSelf(this.rotation);
+        m.skewXSelf(this.skewX);
+        m.skewYSelf(this.skewY);
         return m;
     }
 
