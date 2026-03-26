@@ -109,7 +109,7 @@ export class ArrowShape extends BaseShape {
         this.thickness = Math.max(5, height);
         this.headSize = Math.min(this.headSize, this.length);
     }
-    
+
     private _strokeWidth: number = 2;
 
     private getLocalLinePoints(): { start: Point; end: Point } {
@@ -117,35 +117,38 @@ export class ArrowShape extends BaseShape {
         const centerX = this.length / 2; // Центр по X
         return {
             start: { x: -centerX, y: 0 },
-            end: { x: headBase - centerX, y: 0 }
+            end: { x: headBase - centerX, y: 0 },
         };
     }
 
-    private getLocalHeadLines(): { left: { start: Point; end: Point }; right: { start: Point; end: Point } } {
+    private getLocalHeadLines(): {
+        left: { start: Point; end: Point };
+        right: { start: Point; end: Point };
+    } {
         const headBase = this.length - this.headSize;
         const centerX = this.length / 2;
         const angle = Math.PI / 4;
         const headLength = this.headSize;
-        
+
         const leftEnd = {
-            x: (headBase - headLength * Math.cos(angle)) - centerX,
-            y: -headLength * Math.sin(angle)
+            x: headBase - headLength * Math.cos(angle) - centerX,
+            y: -headLength * Math.sin(angle),
         };
-        
+
         const rightEnd = {
-            x: (headBase - headLength * Math.cos(angle)) - centerX,
-            y: headLength * Math.sin(angle)
+            x: headBase - headLength * Math.cos(angle) - centerX,
+            y: headLength * Math.sin(angle),
         };
-        
+
         return {
             left: {
-                start: { x: headBase - centerX, y: this.strokeWidth * 0.28},
-                end: leftEnd
+                start: { x: headBase - centerX, y: this.strokeWidth * 0.28 },
+                end: leftEnd,
             },
             right: {
-                start: { x: headBase - centerX, y: this.strokeWidth * (-0.28)},
-                end: rightEnd
-            }
+                start: { x: headBase - centerX, y: this.strokeWidth * -0.28 },
+                end: rightEnd,
+            },
         };
     }
 
@@ -177,21 +180,36 @@ export class ArrowShape extends BaseShape {
         const { start, end } = this.getLocalLinePoints();
         return {
             start: { x: start.x * this.scaleX, y: start.y * this.scaleY },
-            end: { x: end.x * this.scaleX, y: end.y * this.scaleY }
+            end: { x: end.x * this.scaleX, y: end.y * this.scaleY },
         };
     }
 
-    private getScaledLocalHeadLines(): { left: { start: Point; end: Point }; right: { start: Point; end: Point } } {
+    private getScaledLocalHeadLines(): {
+        left: { start: Point; end: Point };
+        right: { start: Point; end: Point };
+    } {
         const { left, right } = this.getLocalHeadLines();
         return {
             left: {
-                start: { x: left.start.x * this.scaleX, y: left.start.y * this.scaleY },
-                end: { x: left.end.x * this.scaleX, y: left.end.y * this.scaleY }
+                start: {
+                    x: left.start.x * this.scaleX,
+                    y: left.start.y * this.scaleY,
+                },
+                end: {
+                    x: left.end.x * this.scaleX,
+                    y: left.end.y * this.scaleY,
+                },
             },
             right: {
-                start: { x: right.start.x * this.scaleX, y: right.start.y * this.scaleY },
-                end: { x: right.end.x * this.scaleX, y: right.end.y * this.scaleY }
-            }
+                start: {
+                    x: right.start.x * this.scaleX,
+                    y: right.start.y * this.scaleY,
+                },
+                end: {
+                    x: right.end.x * this.scaleX,
+                    y: right.end.y * this.scaleY,
+                },
+            },
         };
     }
 
@@ -293,7 +311,7 @@ export class ArrowShape extends BaseShape {
         ctx.beginPath();
         ctx.moveTo(linePoints.start.x, linePoints.start.y);
         ctx.lineTo(linePoints.end.x, linePoints.end.y);
-        
+
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
