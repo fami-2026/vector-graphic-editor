@@ -264,6 +264,15 @@ function shapeToSvgElement(shape: Shape): string | null {
                 .join(' ');
             return `<polygon points="${pointsStr}"${transform}${style}/>`;
         }
+        case 'parallelogram': {
+            if (!s.getLocalPoints) return null;
+            const points = s.getLocalPoints();
+            if (!points || points.length === 0) return null;
+            const pointsStr = points
+                .map((p: Point) => `${p.x},${p.y}`)
+                .join(' ');
+            return `<polygon points="${pointsStr}"${transform}${style}/>`;
+        }
         default:
             return null;
     }

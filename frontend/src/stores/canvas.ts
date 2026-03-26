@@ -476,9 +476,11 @@ export const useCanvasStore = defineStore('canvas', () => {
                             ? 'Стрелка'
                             : type === 'hexagon'
                               ? 'Шестиугольник'
-                              : type === 'pencil'
-                                ? 'Карандаш'
-                                : type;
+                              : type === 'parallelogram'
+                                ? 'Параллелограмм'
+                                : type === 'pencil'
+                                  ? 'Карандаш'
+                                  : type;
 
         const number = existingShapesOfType.length + 1;
         const defaultName = `${typeName} ${number}`;

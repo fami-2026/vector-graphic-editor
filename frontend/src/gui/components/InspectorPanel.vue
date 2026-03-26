@@ -1031,6 +1031,8 @@ function getThumbPoints(shape: Shape): string {
         }
         case 'hexagon':
             return generatePolygonPoints(6, 10, 10, 8);
+        case 'parallelogram':
+            return '5,3 18,3 15,17 2,17';
         case 'arrow':
             return '1,8 12,8 12,3 19,10 12,17 12,12 1,12';
         default:
@@ -1075,6 +1077,7 @@ function shapeLabel(type: string) {
         star: 'Звезда',
         arrow: 'Стрелка',
         hexagon: 'Шестиугольник',
+        parallelogram: 'Параллелограмм',
         pencil: 'Карандаш',
     };
     return labels[type] ?? type;

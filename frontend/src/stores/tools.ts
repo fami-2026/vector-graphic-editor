@@ -11,6 +11,7 @@ export type ToolType =
     | 'polygon'
     | 'star'
     | 'hexagon'
+    | 'parallelogram'
     | 'arrow'
     | 'eraser'
     | 'pencil';

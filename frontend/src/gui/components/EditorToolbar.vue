@@ -69,6 +69,12 @@ const tools: ToolConfig[] = [
         action: () => toolsStore.setActiveTool('hexagon'),
     },
     {
+        id: 'parallelogram',
+        icon: '▱',
+        title: 'Параллелограмм',
+        action: () => toolsStore.setActiveTool('parallelogram'),
+    },
+    {
         id: 'arrow',
         icon: '→',
         title: 'Стрелка',
