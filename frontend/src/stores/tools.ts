@@ -11,10 +11,10 @@ export type ToolType =
     | 'polygon'
     | 'star'
     | 'hexagon'
-    | 'parallelogram'
     | 'arrow'
     | 'eraser'
-    | 'pencil';
+    | 'pencil'
+    | 'trapezoid';
 
 type CreationParams = Record<string, unknown> | null;
 

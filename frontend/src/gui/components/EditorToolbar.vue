@@ -69,16 +69,16 @@ const tools: ToolConfig[] = [
         action: () => toolsStore.setActiveTool('hexagon'),
     },
     {
-        id: 'parallelogram',
-        icon: '▱',
-        title: 'Параллелограмм',
-        action: () => toolsStore.setActiveTool('parallelogram'),
-    },
-    {
         id: 'arrow',
         icon: '→',
         title: 'Стрелка',
         action: () => toolsStore.setActiveTool('arrow'),
+    },
+    {
+        id: 'trapezoid',
+        icon: '⏢',
+        title: 'Трапеция',
+        action: () => toolsStore.setActiveTool('trapezoid'),
     },
 ];
 
