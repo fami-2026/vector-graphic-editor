@@ -335,7 +335,8 @@
                                     stroke-width="2"
                                     stroke-linecap="round"
                                 />
-                                <!-- Стрелка (линия с наконечником) -->
+                                
+                                  <!-- Стрелка (линия с наконечником) -->
                                 <g v-else-if="shape.type === 'arrow'">
                                     <line
                                         x1="3"
