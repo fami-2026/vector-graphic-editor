@@ -197,7 +197,8 @@
                                     disabled: !selectedShape || isFillDisabled,
                                 }"
                                 @click="
-                                    !isFillDisabled && showColorPicker('fill')
+                                    !isFillDisabled &&
+                                    showColorPicker('fill', $event)
                                 "
                             />
                             <Teleport to="body">
@@ -267,7 +268,7 @@
                                     disabled:
                                         !selectedShape && !isPencilToolMode,
                                 }"
-                                @click="showColorPicker('stroke')"
+                                @click="showColorPicker('stroke', $event)"
                             />
 
                             <Teleport to="body">
@@ -357,7 +358,7 @@
                                 :style="{
                                     backgroundColor: canvasBackgroundColor,
                                 }"
-                                @click="showCanvasColorPicker"
+                                @click="showCanvasColorPicker($event)"
                             />
 
                             <Teleport to="body">
@@ -540,10 +541,13 @@
 
 <script setup lang="ts">
 import { computed, ref, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import type { Ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useCanvasStore } from '@/stores/canvas';
 import type { Shape } from '@/canvas/types';
 import { useToolsStore } from '@/stores/tools';
+import { getShapeLabel } from '@/config/shapeLabels';
+import { POLYGON_SIDES_LIMITS } from '@/config/tools';
 
 interface ShapeWithName extends Shape {
     name?: string;
@@ -560,7 +564,7 @@ function getShapeDisplayName(shape: Shape) {
         return shapeWithName.name;
     }
 
-    return shapeLabel(shape.type);
+    return getShapeLabel(shape.type);
 }
 
 const activePicker = ref<'fill' | 'stroke' | null>(null);
@@ -578,7 +582,33 @@ const pickerPosition = ref<{
 const fillColorInputRef = ref<HTMLInputElement | null>(null);
 const strokeColorInputRef = ref<HTMLInputElement | null>(null);
 
-function showColorPicker(type: 'fill' | 'stroke') {
+function openNativeColorPicker(
+    target: HTMLElement | null,
+    activate: () => void,
+    inputRef: Ref<HTMLInputElement | null>
+) {
+    if (!target) return;
+
+    const rect = target.getBoundingClientRect();
+
+    pickerPosition.value = {
+        position: 'absolute',
+        top: rect.bottom + window.scrollY - 35 + 'px',
+        left: rect.left + window.scrollX - 250 + 'px',
+        zIndex: 9999,
+    };
+
+    activate();
+
+    nextTick(() => {
+        const input = inputRef.value;
+        if (!input) return;
+        input.focus();
+        input.click();
+    });
+}
+
+function showColorPicker(type: 'fill' | 'stroke', event: MouseEvent) {
     if (
         !selectedShape.value &&
         !(isPencilToolMode.value && type === 'stroke')
@@ -586,29 +616,16 @@ function showColorPicker(type: 'fill' | 'stroke') {
         return;
     }
 
-    const previewElement = event?.currentTarget as HTMLElement;
+    const previewElement = event.currentTarget as HTMLElement | null;
+    const inputRef = type === 'fill' ? fillColorInputRef : strokeColorInputRef;
 
-    if (previewElement) {
-        const rect = previewElement.getBoundingClientRect();
-
-        pickerPosition.value = {
-            position: 'absolute',
-            top: rect.bottom + window.scrollY - 35 + 'px',
-            left: rect.left + window.scrollX - 250 + 'px',
-            zIndex: 9999,
-        };
-
-        activePicker.value = type;
-
-        nextTick(() => {
-            const inputRef =
-                type === 'fill' ? fillColorInputRef : strokeColorInputRef;
-            if (inputRef.value) {
-                inputRef.value.focus();
-                inputRef.value.click();
-            }
-        });
-    }
+    openNativeColorPicker(
+        previewElement,
+        () => {
+            activePicker.value = type;
+        },
+        inputRef
+    );
 }
 
 function onLayerNameBlur(shapeId: string) {
@@ -628,25 +645,17 @@ function onLayerNameEnter(shapeId: string) {
 }
 
 function handleClickOutside(event: MouseEvent) {
-    if (activePicker.value) {
-        const target = event.target as HTMLElement;
-        const isClickOnPreview = target.classList.contains('colorPreview');
-        const isClickInPicker = target.closest('.floatingColorPicker');
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
 
-        if (!isClickInPicker && !isClickOnPreview) {
-            activePicker.value = null;
-        }
-    }
+    const isClickOnPreview = target.classList.contains('colorPreview');
+    const isClickInPicker = target.closest('.floatingColorPicker');
+    const isOutsidePicker = !isClickInPicker && !isClickOnPreview;
 
-    if (activeCanvasPicker.value) {
-        const target = event.target as HTMLElement;
-        const isClickOnPreview = target.classList.contains('colorPreview');
-        const isClickInPicker = target.closest('.floatingColorPicker');
+    if (!isOutsidePicker) return;
 
-        if (!isClickInPicker && !isClickOnPreview) {
-            activeCanvasPicker.value = false;
-        }
-    }
+    activePicker.value = null;
+    activeCanvasPicker.value = false;
 }
 onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -727,6 +736,18 @@ function layerIndexToShapeIndex(layerIndex: number) {
 
 const draggedLayerIndex = ref<number | null>(null);
 
+type NumberFieldKey =
+    | 'x'
+    | 'y'
+    | 'width'
+    | 'height'
+    | 'rotation'
+    | 'skewX'
+    | 'skewY'
+    | 'strokeWidth'
+    | 'scaleX'
+    | 'scaleY';
+
 const wheelStepConfig: Record<NumberFieldKey, number> = {
     x: 1,
     y: 1,
@@ -740,17 +761,19 @@ const wheelStepConfig: Record<NumberFieldKey, number> = {
     scaleY: 0.1,
 };
 
-type NumberFieldKey =
-    | 'x'
-    | 'y'
-    | 'width'
-    | 'height'
-    | 'rotation'
-    | 'skewX'
-    | 'skewY'
-    | 'strokeWidth'
-    | 'scaleX'
-    | 'scaleY';
+const numberFieldNormalizers: Record<NumberFieldKey, (value: number) => number> =
+    {
+        x: (value) => value,
+        y: (value) => value,
+        width: (value) => Math.max(1, value),
+        height: (value) => Math.max(1, value),
+        rotation: (value) => ((value % 360) + 360) % 360,
+        skewX: (value) => Math.min(89, Math.max(-89, value)),
+        skewY: (value) => Math.min(89, Math.max(-89, value)),
+        strokeWidth: (value) => Math.min(MAX_STROKE_WIDTH, Math.max(0, value)),
+        scaleX: (value) => value,
+        scaleY: (value) => value,
+    };
 
 function getCurrentNumberValue(key: NumberFieldKey): number | null {
     if (!selectedShape.value) return null;
@@ -760,20 +783,12 @@ function getCurrentNumberValue(key: NumberFieldKey): number | null {
     return typeof value === 'number' ? value : null;
 }
 
+function roundToTwo(value: number) {
+    return Math.round(value * 100) / 100;
+}
+
 function normalizeNumberByKey(key: NumberFieldKey, value: number) {
-    if (key === 'width' || key === 'height') {
-        return Math.max(1, value);
-    }
-    if (key === 'strokeWidth') {
-        return Math.min(MAX_STROKE_WIDTH, Math.max(0, value));
-    }
-    if (key === 'rotation') {
-        return ((value % 360) + 360) % 360;
-    }
-    if (key === 'skewX' || key === 'skewY') {
-        return Math.min(89, Math.max(-89, value));
-    }
-    return value;
+    return numberFieldNormalizers[key](value);
 }
 
 function applyNumberValue(key: NumberFieldKey, target: HTMLInputElement) {
@@ -792,8 +807,7 @@ function applyNumberValue(key: NumberFieldKey, target: HTMLInputElement) {
         return;
     }
 
-    const normalized =
-        Math.round(normalizeNumberByKey(key, parsed) * 100) / 100;
+    const normalized = roundToTwo(normalizeNumberByKey(key, parsed));
     target.value = String(normalized);
     const currentValue = getCurrentNumberValue(key);
 
@@ -857,13 +871,10 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
         const step = wheelStepConfig[key];
         const delta = event.deltaY > 0 ? -step : step;
         const currentValue = toolsStore.pencilDefaults.strokeWidth;
-        const newValue = Math.min(
-            MAX_STROKE_WIDTH,
-            Math.max(0, currentValue + delta)
-        );
+        const newValue = normalizeNumberByKey(key, currentValue + delta);
 
         toolsStore.setPencilDefaults({
-            strokeWidth: Math.round(newValue * 100) / 100,
+            strokeWidth: roundToTwo(newValue),
         });
         return;
     }
@@ -874,23 +885,10 @@ function onWheelChange(key: NumberFieldKey, event: WheelEvent) {
     const delta = event.deltaY > 0 ? -step : step;
     const currentValue =
         (selectedShape.value as unknown as Record<string, number>)[key] || 0;
-    let newValue = currentValue + delta;
-
-    if (key === 'width' || key === 'height') {
-        newValue = Math.max(1, newValue);
-    }
-    if (key === 'rotation') {
-        newValue = ((newValue % 360) + 360) % 360;
-    }
-    if (key === 'skewX' || key === 'skewY') {
-        newValue = Math.min(89, Math.max(-89, newValue));
-    }
-    if (key === 'strokeWidth') {
-        newValue = Math.min(MAX_STROKE_WIDTH, Math.max(1, newValue));
-    }
+    const newValue = normalizeNumberByKey(key, currentValue + delta);
 
     canvasStore.updateShape(selectedShape.value.id, {
-        [key]: Math.round(newValue * 100) / 100,
+        [key]: roundToTwo(newValue),
     } as Partial<Shape>);
 }
 
@@ -944,7 +942,7 @@ function onFlip(key: 'scaleX' | 'scaleY') {
             if (isLine) {
                 newScaleY = currentScaleY * -1;
             } else {
-                newScaleX = currentScaleX * -1;
+                newScaleY = currentScaleY * -1;
                 newRotation = (180 - currentRotation + 360) % 360;
             }
         }
@@ -971,7 +969,6 @@ function onFlip(key: 'scaleX' | 'scaleY') {
 type ColorFieldKey = 'fill' | 'stroke';
 
 function onColorChange(key: ColorFieldKey, event: Event) {
-    // if (!selectedShape.value) return;
     const target = event.target as HTMLInputElement;
     const value = target.value;
 
@@ -998,7 +995,6 @@ function normalizeOpacity(value: number) {
 }
 
 function onOpacityChange(key: OpacityFieldKey, event: Event) {
-    // if (!selectedShape.value) return;
     const target = event.target as HTMLInputElement;
     const value = normalizeOpacity(Number(target.value));
     if (Number.isNaN(value)) return;
@@ -1014,8 +1010,6 @@ function onOpacityChange(key: OpacityFieldKey, event: Event) {
         [key]: value,
     } as Partial<Shape>);
 }
-
-// ============ МИНИАТЮРЫ СЛОЁВ (SVG) ============
 
 function thumbFill(shape: Shape): string {
     const fill = (shape as unknown as Record<string, unknown>).fill as
@@ -1078,32 +1072,33 @@ function generateStarPoints(
     return pts.join(' ');
 }
 
-function getThumbPoints(shape: Shape): string {
-    const type = shape.type;
-    switch (type) {
-        case 'triangle':
-            return '10,3 2,17 18,17';
-        case 'polygon': {
+const THUMB_POINTS_RESOLVERS: Readonly<Record<string, (shape: Shape) => string>> =
+    {
+        triangle: () => '10,3 2,17 18,17',
+        polygon: (shape) => {
             const sides =
-                ((shape as unknown as Record<string, unknown>)
-                    .sides as number) || 5;
+                ((shape as unknown as Record<string, unknown>).sides as number) ||
+                POLYGON_SIDES_LIMITS.defaultValue;
             return generatePolygonPoints(sides, 10, 10, 8);
-        }
-        case 'star': {
+        },
+        star: (shape) => {
             const numPoints =
                 ((shape as unknown as Record<string, unknown>)
-                    .numPoints as number) || 5;
+                    .numPoints as number) || POLYGON_SIDES_LIMITS.defaultValue;
             return generateStarPoints(numPoints, 10, 10, 8, 4);
-        }
-        case 'hexagon':
-            return generatePolygonPoints(6, 10, 10, 8);
-        case 'parallelogram':
-            return '5,3 18,3 15,17 2,17';
-        case 'arrow':
-            return '1,8 12,8 12,3 19,10 12,17 12,12 1,12';
-        default:
-            return generatePolygonPoints(5, 10, 10, 8);
+        },
+        hexagon: () => generatePolygonPoints(6, 10, 10, 8),
+        parallelogram: () => '5,3 18,3 15,17 2,17',
+        arrow: () => '1,8 12,8 12,3 19,10 12,17 12,12 1,12',
+    };
+
+function getThumbPoints(shape: Shape): string {
+    const resolveThumbPoints = THUMB_POINTS_RESOLVERS[shape.type];
+    if (resolveThumbPoints) {
+        return resolveThumbPoints(shape);
     }
+
+    return generatePolygonPoints(POLYGON_SIDES_LIMITS.defaultValue, 10, 10, 8);
 }
 
 function isNoColorActive(key: OpacityFieldKey) {
@@ -1131,22 +1126,6 @@ function setNoColor(key: OpacityFieldKey) {
     canvasStore.updateShape(selectedShape.value.id, {
         [key]: nextValue,
     } as Partial<Shape>);
-}
-
-function shapeLabel(type: string) {
-    const labels: Record<string, string> = {
-        rect: 'Прямоугольник',
-        circle: 'Круг',
-        line: 'Линия',
-        triangle: 'Треугольник',
-        polygon: 'Многоугольник',
-        star: 'Звезда',
-        arrow: 'Стрелка',
-        hexagon: 'Шестиугольник',
-        parallelogram: 'Параллелограмм',
-        pencil: 'Карандаш',
-    };
-    return labels[type] ?? type;
 }
 
 function onSelectLayer(id: string) {
@@ -1215,12 +1194,11 @@ function moveLayerDown() {
 }
 
 function startEditing(shapeId: string) {
-    console.log('DOUBLE CLICK WORKS', shapeId);
     editingLayerId.value = shapeId;
 
     const shape = shapes.value.find((s) => s.id === shapeId) as ShapeWithName;
     if (shape) {
-        editingLayerName.value = shape.name || shapeLabel(shape.type);
+        editingLayerName.value = shape.name || getShapeLabel(shape.type);
     }
 
     nextTick(() => {
@@ -1253,7 +1231,6 @@ function saveLayerName(shapeId: string, newName: string) {
     cancelEditing();
 }
 
-//Функции для удаления слоя
 function deleteLayer(id: string) {
     if (editingLayerId.value === id) {
         cancelEditing();
@@ -1263,25 +1240,15 @@ function deleteLayer(id: string) {
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-    if (editingLayerId.value) return;
-
-    if (event.key === 'Delete') {
-        if (!selectedShape.value) return;
-
-        canvasStore.deleteShape(selectedShape.value.id);
+    if (editingLayerId.value || event.key !== 'Delete' || !selectedShape.value) {
+        return;
     }
+
+    canvasStore.deleteShape(selectedShape.value.id);
 }
 
 watch([selectedShape, shapes], () => {
     forceUpdate.value++;
-});
-
-onMounted(() => {
-    window.addEventListener('keydown', handleKeyDown);
-});
-
-onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyDown);
 });
 
 const activeCanvasPicker = ref(false);
@@ -1290,32 +1257,18 @@ const canvasBackgroundColor = computed(() => {
     return canvasStore.backgroundColor || '#ffffff';
 });
 
-// Функция показа пикера для фона холста
-function showCanvasColorPicker() {
-    const previewElement = event?.currentTarget as HTMLElement;
+function showCanvasColorPicker(event: MouseEvent) {
+    const previewElement = event.currentTarget as HTMLElement | null;
 
-    if (previewElement) {
-        const rect = previewElement.getBoundingClientRect();
-
-        pickerPosition.value = {
-            position: 'absolute',
-            top: rect.bottom + window.scrollY - 35 + 'px',
-            left: rect.left + window.scrollX - 250 + 'px',
-            zIndex: 9999,
-        };
-
-        activeCanvasPicker.value = true;
-
-        nextTick(() => {
-            if (canvasColorInputRef.value) {
-                canvasColorInputRef.value.focus();
-                canvasColorInputRef.value.click();
-            }
-        });
-    }
+    openNativeColorPicker(
+        previewElement,
+        () => {
+            activeCanvasPicker.value = true;
+        },
+        canvasColorInputRef
+    );
 }
 
-// Функция изменения цвета фона холста
 function onCanvasColorChange(event: Event) {
     const target = event.target as HTMLInputElement;
     const value = target.value;
@@ -1323,7 +1276,6 @@ function onCanvasColorChange(event: Event) {
     canvasStore.setBackgroundColor(value);
 }
 
-// Функция сброса цвета фона
 function resetCanvasBackground() {
     canvasStore.setBackgroundColor('#ffffff');
 }
@@ -1343,9 +1295,6 @@ function resetCanvasBackground() {
 
     max-height: 55vh;
     overflow: auto;
-}
-
-.panel {
     scrollbar-gutter: stable;
 }
 
@@ -1617,26 +1566,6 @@ function resetCanvasBackground() {
     gap: 4px;
 }
 
-.layerItem:hover {
-    background: #f3f4f6;
-}
-
-.layerItem:focus {
-    outline: none;
-}
-
-.layerItem:focus-visible {
-    outline: 2px solid rgba(37, 99, 235, 0.55);
-    outline-offset: 2px;
-    border-radius: 10px;
-}
-
-.layerItem.isActive {
-    background: rgba(37, 99, 235, 0.12);
-    border-color: rgba(37, 99, 235, 0.3);
-}
-
-/* Стили для инпута редактирования имени */
 .layerNameInput {
     font-size: 12px;
     font-weight: 500;
@@ -1656,7 +1585,6 @@ function resetCanvasBackground() {
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
-/*Стиль для крестика для удаления слоев */
 .deleteLayerBtn {
     width: 20px;
     height: 20px;
@@ -1692,7 +1620,6 @@ function resetCanvasBackground() {
     color: #dc2626;
 }
 
-/* Добавьте в конец style scoped */
 .colorInputWrapper {
     width: 100%;
     position: relative;

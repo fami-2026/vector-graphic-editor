@@ -22,9 +22,3 @@ body {
 button {
     font: inherit;
 }
-
-html,
-body,
-#app {
-    font-family: 'Montserrat', sans-serif;
-}

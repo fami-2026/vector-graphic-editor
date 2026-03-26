@@ -1,4 +1,5 @@
 import type { Shape, Point } from '@/canvas/types';
+import { getShapeLabel } from '@/config/shapeLabels';
 
 export type ExportFormat = 'png' | 'svg';
 export type ExportArea = 'scene' | 'region';
@@ -169,7 +170,6 @@ async function exportSvg(
     options: ExportOptions
 ): Promise<void> {
     const background = options.background ?? 'transparent';
-    //const backgroundFill = resolveBackgroundFill(background);
     const { width, height } = target.bounds;
 
     const svgParts: string[] = [
@@ -182,12 +182,6 @@ async function exportSvg(
             `  <rect x="0" y="0" width="${width}" height="${height}" fill="${background === 'white' ? '#ffffff' : background}"/>`
         );
     }
-
-    // if (backgroundFill) {
-    //     svgParts.push(
-    //         `  <rect x="0" y="0" width="${width}" height="${height}" fill="${backgroundFill}"/>`
-    //     );
-    // }
 
     svgParts.push(
         `  <g transform="translate(${-target.bounds.x}, ${-target.bounds.y})">`
@@ -210,89 +204,181 @@ async function exportSvg(
     triggerDownload(blob, fileName);
 }
 
+type SvgShapeAccess = Shape & {
+    width?: number;
+    height?: number;
+    radiusX?: number;
+    radiusY?: number;
+    fill?: string;
+    fillOpacity?: number;
+    stroke?: string;
+    strokeOpacity?: number;
+    strokeWidth?: number;
+    localEndPoint?: Point;
+    points?: Point[];
+    getLocalPoints?: () => Point[];
+    getLocalArrowPoints?: () => Point[];
+    getScaledLocalArrowPoints?: () => Point[];
+};
+
+type SvgRendererContext = {
+    shape: Shape;
+    access: SvgShapeAccess;
+    transform: string;
+    style: string;
+};
+
+type SvgShapeRenderer = (ctx: SvgRendererContext) => string | null;
+
+function pointsToSvgString(points: Point[]): string {
+    return points.map((point) => `${point.x},${point.y}`).join(' ');
+}
+
+function renderPolygonSvg(
+    points: Point[] | null,
+    transform: string,
+    style: string
+): string | null {
+    if (!points || points.length < 3) return null;
+    return `<polygon points="${pointsToSvgString(points)}"${transform}${style} stroke-linejoin="round"/>`;
+}
+
+function getScaledArrowPoints(shape: Shape, access: SvgShapeAccess): Point[] | null {
+    if (access.getScaledLocalArrowPoints) {
+        return access.getScaledLocalArrowPoints();
+    }
+
+    if (!access.getLocalArrowPoints) {
+        return null;
+    }
+
+    return access.getLocalArrowPoints().map((point) => ({
+        x: point.x * shape.scaleX,
+        y: point.y * shape.scaleY,
+    }));
+}
+
+function getParallelogramPoints(
+    shape: Shape,
+    access: SvgShapeAccess
+): Point[] | null {
+    const rawPoints = access.getLocalPoints?.() ?? null;
+    if (!rawPoints || rawPoints.length < 3) {
+        return null;
+    }
+
+    const signX = Math.sign(shape.scaleX) || 1;
+    const signY = Math.sign(shape.scaleY) || 1;
+
+    return rawPoints.map((point) => ({
+        x: point.x * signX,
+        y: point.y * signY,
+    }));
+}
+
+const SVG_SHAPE_RENDERERS: Readonly<Record<string, SvgShapeRenderer>> = {
+    rect: ({ shape, access, transform, style }) => {
+        const width = typeof access.width === 'number' ? access.width : 0;
+        const height = typeof access.height === 'number' ? access.height : 0;
+        const renderedWidth = Math.abs(width * shape.scaleX);
+        const renderedHeight = Math.abs(height * shape.scaleY);
+        const x = -renderedWidth / 2;
+        const y = -renderedHeight / 2;
+
+        return `<rect x="${x}" y="${y}" width="${renderedWidth}" height="${renderedHeight}"${transform}${style}/>`;
+    },
+    circle: ({ shape, access, transform, style }) => {
+        const radiusX = typeof access.radiusX === 'number' ? access.radiusX : 0;
+        const radiusY = typeof access.radiusY === 'number' ? access.radiusY : 0;
+        const rx = Math.abs(radiusX * shape.scaleX);
+        const ry = Math.abs(radiusY * shape.scaleY);
+
+        return `<ellipse cx="0" cy="0" rx="${rx}" ry="${ry}"${transform}${style}/>`;
+    },
+    triangle: ({ access, transform, style }) =>
+        renderPolygonSvg(access.getLocalPoints?.() ?? null, transform, style),
+    polygon: ({ access, transform, style }) =>
+        renderPolygonSvg(access.getLocalPoints?.() ?? null, transform, style),
+    line: ({ shape, access, transform, style }) => {
+        if (!access.localEndPoint) return null;
+
+        const x2 = access.localEndPoint.x * shape.scaleX;
+        const y2 = access.localEndPoint.y * shape.scaleY;
+
+        return `<line x1="0" y1="0" x2="${x2}" y2="${y2}"${transform}${style} stroke-linecap="round"/>`;
+    },
+    arrow: ({ shape, access, transform, style }) =>
+        renderPolygonSvg(getScaledArrowPoints(shape, access), transform, style),
+    star: ({ access, transform, style }) =>
+        renderPolygonSvg(access.getLocalPoints?.() ?? null, transform, style),
+    hexagon: ({ access, transform, style }) =>
+        renderPolygonSvg(access.getLocalPoints?.() ?? null, transform, style),
+    parallelogram: ({ shape, access, transform, style }) =>
+        renderPolygonSvg(getParallelogramPoints(shape, access), transform, style),
+    pencil: ({ shape, access, transform, style }) => {
+        const points = access.points ?? [];
+        const pathData = buildPencilPath(points, shape.scaleX, shape.scaleY);
+        if (!pathData) return null;
+
+        return `<path d="${pathData}" fill="none"${transform}${style} stroke-linecap="round" stroke-linejoin="round"/>`;
+    },
+};
+
 function shapeToSvgElement(shape: Shape): string | null {
     const transform = buildSvgTransform(shape);
-    const style = buildSvgStyle(shape);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const s = shape as any;
+    const style = buildSvgStyle(shape as unknown as SvgStyleShape);
+    const renderer = SVG_SHAPE_RENDERERS[shape.type];
 
-    switch (shape.type) {
-        case 'rect': {
-            const w = Math.abs(s.width * shape.scaleX);
-            const h = Math.abs(s.height * shape.scaleY);
-            const x = -w / 2;
-            const y = -h / 2;
-            return `<rect x="${x}" y="${y}" width="${w}" height="${h}"${transform}${style}/>`;
-        }
-        case 'circle': {
-            const rx = Math.abs(s.radiusX * shape.scaleX);
-            const ry = Math.abs(s.radiusY * shape.scaleY);
-            return `<ellipse cx="0" cy="0" rx="${rx}" ry="${ry}"${transform}${style}/>`;
-        }
-        case 'triangle': {
-            const halfW = s.width / 2;
-            const halfH = s.height / 2;
-            const points = [
-                { x: 0, y: -halfH },
-                { x: -halfW, y: halfH },
-                { x: halfW, y: halfH },
-            ];
-            const pointsStr = points.map((p) => `${p.x},${p.y}`).join(' ');
-            return `<polygon points="${pointsStr}"${transform}${style}/>`;
-        }
-        case 'polygon': {
-            const points = s.getLocalPoints();
-            if (!points) return null;
-            const pointsStr = points
-                .map((p: Point) => `${p.x},${p.y}`)
-                .join(' ');
-            return `<polygon points="${pointsStr}"${transform}${style}/>`;
-        }
-        case 'line': {
-            if (!s.localEndPoint) return null;
-            const x2 = s.localEndPoint.x * shape.scaleX;
-            const y2 = s.localEndPoint.y * shape.scaleY;
-            return `<line x1="0" y1="0" x2="${x2}" y2="${y2}"${transform}${style}/>`;
-        }
-        case 'arrow': {
-            if (!s.getLocalArrowPoints) return null;
-            const points = s.getLocalArrowPoints();
-            if (!points || points.length === 0) return null;
-            const pointsStr = points
-                .map((p: Point) => `${p.x},${p.y}`)
-                .join(' ');
-            return `<polygon points="${pointsStr}"${transform}${style}/>`;
-        }
-        case 'star': {
-            if (!s.getLocalPoints) return null;
-            const points = s.getLocalPoints();
-            if (!points || points.length === 0) return null;
-            const pointsStr = points
-                .map((p: Point) => `${p.x},${p.y}`)
-                .join(' ');
-            return `<polygon points="${pointsStr}"${transform}${style}/>`;
-        }
-        case 'hexagon': {
-            if (!s.getLocalPoints) return null;
-            const points = s.getLocalPoints();
-            if (!points || points.length === 0) return null;
-            const pointsStr = points
-                .map((p: Point) => `${p.x},${p.y}`)
-                .join(' ');
-            return `<polygon points="${pointsStr}"${transform}${style}/>`;
-        }
-        case 'parallelogram': {
-            if (!s.getLocalPoints) return null;
-            const points = s.getLocalPoints();
-            if (!points || points.length === 0) return null;
-            const pointsStr = points
-                .map((p: Point) => `${p.x},${p.y}`)
-                .join(' ');
-            return `<polygon points="${pointsStr}"${transform}${style}/>`;
-        }
-        default:
-            return null;
+    if (!renderer) {
+        return null;
     }
+
+    return renderer({
+        shape,
+        access: shape as SvgShapeAccess,
+        transform,
+        style,
+    });
+}
+
+function buildPencilPath(
+    points: Point[],
+    scaleX: number,
+    scaleY: number
+): string | null {
+    if (points.length === 0) return null;
+
+    const first = points[0];
+    if (!first) return null;
+
+    const firstX = first.x * scaleX;
+    const firstY = first.y * scaleY;
+
+    if (points.length === 1) {
+        return `M ${firstX} ${firstY} L ${firstX} ${firstY}`;
+    }
+
+    let d = `M ${firstX} ${firstY}`;
+
+    for (let i = 1; i < points.length - 1; i++) {
+        const current = points[i];
+        const next = points[i + 1];
+        if (!current || !next) continue;
+
+        const midX = ((current.x + next.x) / 2) * scaleX;
+        const midY = ((current.y + next.y) / 2) * scaleY;
+        const controlX = current.x * scaleX;
+        const controlY = current.y * scaleY;
+
+        d += ` Q ${controlX} ${controlY} ${midX} ${midY}`;
+    }
+
+    const last = points[points.length - 1];
+    if (last) {
+        d += ` L ${last.x * scaleX} ${last.y * scaleY}`;
+    }
+
+    return d;
 }
 
 function buildSvgTransform(shape: Shape): string {
@@ -312,15 +398,19 @@ function buildSvgTransform(shape: Shape): string {
     if (shape.type !== 'line' && shape.skewY !== 0) {
         transforms.push(`skewY(${shape.skewY})`);
     }
-    if (shape.scaleX !== 1 || shape.scaleY !== 1) {
-        transforms.push(`scale(${shape.scaleX}, ${shape.scaleY})`);
-    }
 
     return transforms.length > 0 ? ` transform="${transforms.join(' ')}"` : '';
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildSvgStyle(shape: any): string {
+type SvgStyleShape = Partial<{
+    fill: string;
+    fillOpacity: number;
+    stroke: string;
+    strokeOpacity: number;
+    strokeWidth: number;
+}>;
+
+function buildSvgStyle(shape: SvgStyleShape): string {
     const attrs: string[] = [];
 
     const fillOpacity = shape.fillOpacity ?? 1;
@@ -404,7 +494,7 @@ function getShapeDisplayName(shape: Shape): string {
         return shapeWithName.name;
     }
 
-    return shape.type;
+    return getShapeLabel(shape.type);
 }
 
 function validateShapeBounds(shapes: Shape[]): void {
@@ -415,7 +505,7 @@ function validateShapeBounds(shapes: Shape[]): void {
         const box = shape.getBoundingBox();
 
         const width = Math.abs(box.maxX - box.minX);
-        const height = Math.max(box.maxY - box.minY);
+        const height = Math.abs(box.maxY - box.minY);
         const area = width * height;
 
         const hasInvalidNumbers =

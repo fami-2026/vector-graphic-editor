@@ -16,33 +16,21 @@
                 <div class="column">
                     <h5 class="columnTitle">Инструменты</h5>
                     <ul class="list">
-                        <li><span>1</span> — курсор</li>
-                        <li><span>2</span> — линия</li>
-                        <li><span>3</span> — прямоугольник</li>
-                        <li><span>4</span> — круг</li>
-                        <li><span>5</span> — треугольник</li>
-                        <li><span>6</span> — многоугольник</li>
-                        <li><span>7</span> — звезда</li>
-                        <li><span>8</span> — шестиугольник</li>
-                        <li><span>9</span> — стрелка</li>
-                        <li><span>0</span> — ластик</li>
+                        <li v-for="shortcut in toolShortcuts" :key="shortcut.key">
+                            <span>{{ shortcut.key }}</span> — {{ shortcut.title }}
+                        </li>
                     </ul>
                 </div>
 
                 <div class="column">
                     <h5 class="columnTitle">Другое</h5>
                     <ul class="list">
-                        <li><span>+</span> — увеличить масштаб</li>
-                        <li><span>-</span> — уменьшить масштаб</li>
-                        <li><span>Ctrl + C</span> — копировать фигуру</li>
-                        <li><span>Ctrl + V</span> — вставить фигуру</li>
-                        <li><span>Ctrl + D</span> — дублировать фигуру</li>
-                        <li><span>Delete</span> — удалить фигуру</li>
-                        <li><span>Ctrl + Z</span> — отмена</li>
-                        <li><span>Ctrl + Shift + Z</span> — повтор</li>
-                        <li>
-                            <span>Shift + Space</span> — скрыть / показать
-                            рабочую область
+                        <li
+                            v-for="shortcut in GENERAL_SHORTCUTS_HELP"
+                            :key="shortcut.key"
+                        >
+                            <span>{{ shortcut.key }}</span> —
+                            {{ shortcut.description }}
                         </li>
                     </ul>
                 </div>
@@ -52,9 +40,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { DIGIT_SHORTCUTS_HELP, getToolTitle } from '@/config/tools';
+import { GENERAL_SHORTCUTS_HELP } from '@/config/hotkeys';
 
 const isOpen = ref(false);
+
+const toolShortcuts = computed(() =>
+    DIGIT_SHORTCUTS_HELP.map((shortcut) => ({
+        key: shortcut.key,
+        title: getToolTitle(shortcut.tool).toLowerCase(),
+    }))
+);
 </script>
 
 <style scoped>

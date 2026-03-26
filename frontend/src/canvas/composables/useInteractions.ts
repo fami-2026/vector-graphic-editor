@@ -7,21 +7,16 @@ import type {
     PencilShape,
 } from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
-import { useToolsStore, type ToolType } from '@/stores/tools';
-import { SELECTION_PADDING } from '@/canvas/types';
-
-type ResizeHandle =
-    | 'l'
-    | 'r'
-    | 't'
-    | 'b'
-    | 'lt'
-    | 'rt'
-    | 'lb'
-    | 'rb'
-    | 's'
-    | 'e'
-    | 'rot';
+import { useToolsStore } from '@/stores/tools';
+import { SHAPE_CREATION_TOOLS, type ToolType } from '@/config/tools';
+import {
+    detectResizeHandle,
+    getCursorStyle,
+    getGlobalCursorStyle,
+    getSelectionBox,
+    hitTestSelectionBox,
+    type ResizeHandle,
+} from './useInteractions.helpers';
 
 interface ShapeResizeState {
     shape: Shape;
@@ -74,6 +69,383 @@ export function useInteractions(
     const dragStartPositions = ref<Map<string, Point>>(new Map());
 
     const DRAG_THRESHOLD = 3;
+    const MIN_RESIZE_BASE_SIZE = 0.1;
+    const MIN_SHAPE_SIZE = 1;
+    const MIN_PROPORTIONAL_RATIO = 0.01;
+    const MIN_CREATE_DRAG_DISTANCE_SQ = 4;
+    const MIN_PENCIL_POINT_DISTANCE = 1;
+    const LINE_SNAP_ANGLE_STEP = Math.PI / 4;
+    const DIRECTIONAL_HANDLE_MAX_LENGTH = 2;
+    const FULL_ROTATION_DEGREES = 360;
+    type HandleFlags = Readonly<{
+        left: boolean;
+        right: boolean;
+        top: boolean;
+        bottom: boolean;
+    }>;
+    type NormalizedBounds = Readonly<{
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+        width: number;
+        height: number;
+        signX: -1 | 1;
+        signY: -1 | 1;
+    }>;
+    type AxisBounds = Readonly<{ min: number; max: number }>;
+
+    function setCanvasCursor(cursor: string) {
+        const canvas = canvasRef.value;
+        if (!canvas) return;
+        canvas.style.cursor = cursor;
+    }
+
+    function startInteractionIfNeeded() {
+        if (hasRecordedInteraction.value) return;
+        canvasStore.startInteraction();
+        hasRecordedInteraction.value = true;
+    }
+
+    /**
+     * Фильтрует микродвижения мыши, чтобы не стартовать drag/resize от случайного дрожания курсора.
+     */
+    function passDragThreshold(dx: number, dy: number): boolean {
+        if (hasMoved.value) return true;
+
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) {
+            return false;
+        }
+
+        hasMoved.value = true;
+        return true;
+    }
+
+    function readCreationParams(): Record<string, unknown> | null {
+        return toolsStore.creationParams;
+    }
+
+    function clearToolCreationParams() {
+        toolsStore.clearCreationParams();
+    }
+
+    function beginCreation(tool: ToolType, point: Point) {
+        canvasStore.clearSelection();
+        activeShape.value = null;
+        isCreating.value = true;
+        createStart.value = point;
+        createToolType.value = tool;
+        createParams.value = readCreationParams();
+    }
+
+    function startPanInteraction(event: MouseEvent) {
+        isPanning.value = true;
+        panStart.value = { x: event.clientX, y: event.clientY };
+        setCanvasCursor('grabbing');
+    }
+
+    function handleEraserInteraction(topShape: Shape | null) {
+        if (!topShape) {
+            return;
+        }
+
+        if (canvasStore.selectedIds.includes(topShape.id)) {
+            canvasStore.deleteSelectedShapes();
+            return;
+        }
+
+        canvasStore.deleteShape(topShape.id);
+    }
+
+    function startPencilCreation(point: Point) {
+        beginCreation('pencil', point);
+        startInteractionIfNeeded();
+
+        const newShape = canvasStore.addShape(
+            'pencil',
+            { x: point.x, y: point.y },
+            createParams.value ?? undefined,
+            false
+        ) as PencilShape;
+
+        newShape.stroke = toolsStore.pencilDefaults.stroke;
+        newShape.strokeOpacity = toolsStore.pencilDefaults.strokeOpacity;
+        newShape.strokeWidth = toolsStore.pencilDefaults.strokeWidth;
+
+        activeShape.value = newShape;
+        setCanvasCursor('crosshair');
+    }
+
+    function getCurrentSelectionBox(): BoundingBox | null {
+        return getSelectionBox(
+            canvasStore.selectionRect,
+            canvasStore.selectedIds.length
+        );
+    }
+
+    /**
+     * Преобразует код хэндла (lt/rb/...) в набор осевых флагов для математики ресайза.
+     */
+    function getHandleFlags(handle: ResizeHandle): HandleFlags {
+        const directionalHandle =
+            handle.length <= DIRECTIONAL_HANDLE_MAX_LENGTH ? handle : '';
+        return {
+            left: directionalHandle.includes('l'),
+            right: directionalHandle.includes('r'),
+            top: directionalHandle.includes('t'),
+            bottom: directionalHandle.includes('b'),
+        };
+    }
+
+    function isCornerHandle(flags: HandleFlags): boolean {
+        return (flags.left || flags.right) && (flags.top || flags.bottom);
+    }
+
+    /**
+     * Проверяет, есть ли среди выделения повернутые фигуры.
+     * Это важно для принудительного пропорционального ресайза группы.
+     */
+    function hasRotatedShapes(states: Map<string, ShapeResizeState>): boolean {
+        for (const state of states.values()) {
+            if (Math.abs(state.shape.rotation % 180) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function applyFlipRotation(
+        startRotation: number,
+        flipX: boolean,
+        flipY: boolean
+    ): number {
+        let nextRotation = startRotation;
+        if (flipX) {
+            nextRotation =
+                (FULL_ROTATION_DEGREES - nextRotation) % FULL_ROTATION_DEGREES;
+        }
+        if (flipY) {
+            nextRotation =
+                (FULL_ROTATION_DEGREES - nextRotation) % FULL_ROTATION_DEGREES;
+        }
+        return nextRotation;
+    }
+
+    /**
+     * Вычисляет знак масштаба при пересечении курсором фиксированной оси.
+     * Используется для корректного отражения фигуры при ресайзе.
+     */
+    function resolveScaleSign(
+        pointer: number,
+        anchor: number,
+        expectedDirection: -1 | 1
+    ): -1 | 1 {
+        const actualDirection = Math.sign(pointer - anchor) || expectedDirection;
+        return actualDirection === expectedDirection ? 1 : -1;
+    }
+
+    function updateSelectionRectBounds(
+        minX: number,
+        minY: number,
+        maxX: number,
+        maxY: number
+    ) {
+        if (!canvasStore.selectionRect) return;
+        canvasStore.selectionRect.start = { x: minX, y: minY };
+        canvasStore.selectionRect.end = { x: maxX, y: maxY };
+    }
+
+    function moveSelectionRectFromStart(
+        startBox: BoundingBox,
+        deltaX: number,
+        deltaY: number
+    ) {
+        updateSelectionRectBounds(
+            startBox.minX + deltaX,
+            startBox.minY + deltaY,
+            startBox.maxX + deltaX,
+            startBox.maxY + deltaY
+        );
+    }
+
+    /**
+     * Нормализует сырой прямоугольник ресайза:
+     * приводит min/max в корректный порядок и сохраняет знаки отражения по осям.
+     */
+    function normalizeBounds(
+        rawMinX: number,
+        rawMaxX: number,
+        rawMinY: number,
+        rawMaxY: number
+    ): NormalizedBounds {
+        const signX: -1 | 1 = rawMinX > rawMaxX ? -1 : 1;
+        const signY: -1 | 1 = rawMinY > rawMaxY ? -1 : 1;
+        const minX = Math.min(rawMinX, rawMaxX);
+        const maxX = Math.max(rawMinX, rawMaxX);
+        const minY = Math.min(rawMinY, rawMaxY);
+        const maxY = Math.max(rawMinY, rawMaxY);
+
+        return {
+            minX,
+            maxX,
+            minY,
+            maxY,
+            width: Math.max(MIN_SHAPE_SIZE, maxX - minX),
+            height: Math.max(MIN_SHAPE_SIZE, maxY - minY),
+            signX,
+            signY,
+        };
+    }
+
+    /**
+     * Вычисляет относительный коэффициент изменения размера вдоль одной оси.
+     */
+    function resolveAxisRatio(
+        pointer: number,
+        startMin: number,
+        startMax: number,
+        size: number,
+        negative: boolean,
+        positive: boolean
+    ): number {
+        if (negative) {
+            return (startMax - pointer) / size;
+        }
+        if (positive) {
+            return (pointer - startMin) / size;
+        }
+        return 1;
+    }
+
+    /**
+     * Выбирает единый пропорциональный коэффициент для shift-ресайза.
+     */
+    function resolveProportionalRatio(
+        ratioX: number,
+        ratioY: number,
+        flags: HandleFlags
+    ): number {
+        if (flags.left || flags.right) {
+            return Math.abs(ratioX);
+        }
+        if (flags.top || flags.bottom) {
+            return Math.abs(ratioY);
+        }
+        return Math.max(Math.abs(ratioX), Math.abs(ratioY));
+    }
+
+    /**
+     * Строит границы по одной оси для пропорционального ресайза
+     * с учетом фиксированной стороны и направления.
+     */
+    function resolveProportionalAxisBounds(
+        startMin: number,
+        startMax: number,
+        size: number,
+        ratio: number,
+        direction: number,
+        negative: boolean,
+        positive: boolean
+    ): AxisBounds {
+        if (negative) {
+            return {
+                min: startMax - size * ratio * direction,
+                max: startMax,
+            };
+        }
+        if (positive) {
+            return {
+                min: startMin,
+                max: startMin + size * ratio * direction,
+            };
+        }
+
+        const half = (size * ratio) / 2;
+        const center = (startMin + startMax) / 2;
+        return {
+            min: center - half,
+            max: center + half,
+        };
+    }
+
+    /**
+     * Строит границы по оси для свободного (непропорционального) ресайза.
+     */
+    function resolveFreeAxisBounds(
+        startMin: number,
+        startMax: number,
+        delta: number,
+        negative: boolean,
+        positive: boolean
+    ): AxisBounds {
+        return {
+            min: negative ? startMin + delta : startMin,
+            max: positive ? startMax + delta : startMax,
+        };
+    }
+
+    /**
+     * Преобразует текущую позицию курсора в новые min/max выбранной оси.
+     */
+    function resolveAxisBoundsFromPointer(
+        pointer: number,
+        startMin: number,
+        startMax: number,
+        negative: boolean,
+        positive: boolean
+    ): AxisBounds {
+        if (negative) {
+            return {
+                min: Math.min(startMax, pointer),
+                max: Math.max(startMax, pointer),
+            };
+        }
+        if (positive) {
+            return {
+                min: Math.min(startMin, pointer),
+                max: Math.max(startMin, pointer),
+            };
+        }
+        return { min: startMin, max: startMax };
+    }
+
+    function resetResizeState() {
+        isResizing.value = false;
+        resizeHandle.value = null;
+        resizeStartLocalBox.value = null;
+        resizeStartMatrix.value = null;
+        resizeStartInverse.value = null;
+        resizeStartRotation.value = 0;
+        rotateLastPointerAngle.value = null;
+        lineStartLocal.value = null;
+    }
+
+    function resetMultiSelectionState() {
+        isDraggingMultiple.value = false;
+        isResizingMultiple.value = false;
+        multiResizeStates.value.clear();
+        selectionStartBox.value = null;
+        dragStartPositions.value.clear();
+    }
+
+    function resetCreationState() {
+        isCreating.value = false;
+        createStart.value = null;
+        createToolType.value = null;
+        createParams.value = null;
+    }
+
+    function resetCreationDraftState() {
+        createStart.value = null;
+        createToolType.value = null;
+        createParams.value = null;
+    }
+
+    function endInteractionIfNeeded() {
+        if (!hasRecordedInteraction.value) return;
+        canvasStore.endInteraction();
+        hasRecordedInteraction.value = false;
+    }
 
     watch(
         () => toolsStore.activeTool,
@@ -97,22 +469,9 @@ export function useInteractions(
 
             if (!selected && canvasStore.selectedIds.length === 0) {
                 isDragging.value = false;
-                isResizing.value = false;
-                isDraggingMultiple.value = false;
-                isResizingMultiple.value = false;
-                resizeHandle.value = null;
-                resizeStartLocalBox.value = null;
-                resizeStartMatrix.value = null;
-                resizeStartInverse.value = null;
-                resizeStartRotation.value = 0;
-                rotateLastPointerAngle.value = null;
-                lineStartLocal.value = null;
-                multiResizeStates.value.clear();
-                selectionStartBox.value = null;
-                dragStartPositions.value.clear();
-                createStart.value = null;
-                createToolType.value = null;
-                createParams.value = null;
+                resetResizeState();
+                resetMultiSelectionState();
+                resetCreationDraftState();
                 hasMoved.value = false;
             }
         },
@@ -187,289 +546,13 @@ export function useInteractions(
         }
         return null;
     }
-
-    function detectResizeHandle(
-        shape: Shape,
-        globalPoint: Point
-    ): ResizeHandle | null {
-        const zoomCoef = 100 / zoom.value;
-        const cornerRadius = 8 * zoomCoef;
-        const edgeRadius = 4 * zoomCoef;
-
-        if (shape.type === 'line') {
-            const line = shape as LineShape;
-            if (!line.localEndPoint) return null;
-
-            const vPt = line.toVLocalPoint(globalPoint);
-
-            const ex = line.localEndPoint.x * line.scaleX;
-            const ey = line.localEndPoint.y * line.scaleY;
-
-            const distS = Math.hypot(vPt.x, vPt.y);
-            const distE = Math.hypot(vPt.x - ex, vPt.y - ey);
-
-            if (distS <= cornerRadius && distS <= distE) return 's';
-            if (distE <= cornerRadius) return 'e';
-
-            return null;
-        }
-
-        const box = shape.getLocalBox();
-        const pad = SELECTION_PADDING * zoomCoef;
-
-        const minX = box.minX - pad;
-        const maxX = box.maxX + pad;
-        const minY = box.minY - pad;
-        const maxY = box.maxY + pad;
-
-        const x1 = box.minX * shape.scaleX;
-        const y1 = box.minY * shape.scaleY;
-        const x2 = box.maxX * shape.scaleX;
-        const y2 = box.maxY * shape.scaleY;
-        const rawX = Math.min(x1, x2);
-        const rawY = Math.min(y1, y2);
-        const rawW = Math.abs(x2 - x1);
-        const rawH = Math.abs(y2 - y1);
-        const rectX = rawX - pad;
-        const rectY = rawY - pad;
-        const rectW = rawW + pad * 2;
-        const rectH = rawH + pad * 2;
-        const visualRotY = rectY - 20 * zoomCoef;
-
-        const hX1 = rectX;
-        const hY1 = rectY;
-        const hX2 = rectX + rectW;
-        const hY2 = rectY + rectH;
-        const vMatrix = shape.getVMatrix();
-
-        const handles: Array<[ResizeHandle, number, number]> = [
-            ['rot', 0, visualRotY],
-            ['lt', hX1, hY1],
-            ['rt', hX2, hY1],
-            ['rb', hX2, hY2],
-            ['lb', hX1, hY2],
-        ];
-
-        let closestHandle: ResizeHandle | null = null;
-        let closestDistance = cornerRadius;
-
-        handles.forEach(([handle, x, y]) => {
-            const p = new DOMPoint(x, y).matrixTransform(vMatrix);
-            const dist = Math.hypot(globalPoint.x - p.x, globalPoint.y - p.y);
-            if (dist <= closestDistance) {
-                closestDistance = dist;
-                closestHandle = handle;
-            }
-        });
-
-        if (closestHandle) return closestHandle;
-
-        const localPoint = shape.toLocalPoint(globalPoint);
-
-        const dxMin = Math.abs(localPoint.x - minX);
-        const dxMax = Math.abs(localPoint.x - maxX);
-        const dyMin = Math.abs(localPoint.y - minY);
-        const dyMax = Math.abs(localPoint.y - maxY);
-
-        const inX = localPoint.x >= minX && localPoint.x <= maxX;
-        const inY = localPoint.y >= minY && localPoint.y <= maxY;
-
-        let minE = edgeRadius;
-        let closestEdge: ResizeHandle | null = null;
-
-        if (inY) {
-            if (dxMin <= minE) {
-                minE = dxMin;
-                closestEdge = 'l';
-            }
-            if (dxMax <= minE) {
-                minE = dxMax;
-                closestEdge = 'r';
-            }
-        }
-        if (inX) {
-            if (dyMin <= minE) {
-                minE = dyMin;
-                closestEdge = 't';
-            }
-            if (dyMax <= minE) {
-                minE = dyMax;
-                closestEdge = 'b';
-            }
-        }
-
-        return closestEdge;
-    }
-
-    function getGlobalCursorStyle(handle: string): string {
-        const map: Record<string, string> = {
-            t: 'ns-resize',
-            b: 'ns-resize',
-            l: 'ew-resize',
-            r: 'ew-resize',
-            lt: 'nwse-resize',
-            rb: 'nwse-resize',
-            rt: 'nesw-resize',
-            lb: 'nesw-resize',
-        };
-        return map[handle] ?? 'default';
-    }
-
-    function getCursorStyle(handle: string, shape: Shape): string {
-        if (handle === 's' || handle === 'e') return 'crosshair';
-        if (handle === 'rot') return 'grabbing';
-
-        const handleAngles: Partial<Record<ResizeHandle, number>> = {
-            t: 0,
-            rt: 45,
-            r: 90,
-            rb: 135,
-            b: 180,
-            lb: 225,
-            l: 270,
-            lt: 315,
-        };
-
-        let baseAngle = handleAngles[handle as ResizeHandle];
-        if (baseAngle === undefined) return 'default';
-
-        if (shape.scaleX < 0) baseAngle = (360 - baseAngle) % 360;
-        if (shape.scaleY < 0) baseAngle = (180 - baseAngle + 360) % 360;
-
-        const totalAngle = (baseAngle + shape.rotation) % 360;
-        const index = Math.round(totalAngle / 45) % 8;
-
-        const cursors = [
-            'ns-resize',
-            'nesw-resize',
-            'ew-resize',
-            'nwse-resize',
-            'ns-resize',
-            'nesw-resize',
-            'ew-resize',
-            'nwse-resize',
-        ];
-
-        return cursors[index] ?? 'default';
-    }
-
-    function getVisualSelectionBox(): BoundingBox | null {
-        if (!canvasStore.selectionRect || canvasStore.selectedIds.length === 0)
-            return null;
-
-        return {
-            minX: Math.min(
-                canvasStore.selectionRect.start.x,
-                canvasStore.selectionRect.end.x
-            ),
-            minY: Math.min(
-                canvasStore.selectionRect.start.y,
-                canvasStore.selectionRect.end.y
-            ),
-            maxX: Math.max(
-                canvasStore.selectionRect.start.x,
-                canvasStore.selectionRect.end.x
-            ),
-            maxY: Math.max(
-                canvasStore.selectionRect.start.y,
-                canvasStore.selectionRect.end.y
-            ),
-        };
-    }
-
-    function hitTestSelectionBox(point: Point): {
-        handle: ResizeHandle | null;
-        isInside: boolean;
-    } {
-        const selectionBox = getVisualSelectionBox();
-        if (!selectionBox) return { handle: null, isInside: false };
-
-        const zoomCoef = 100 / zoom.value;
-        const padding = SELECTION_PADDING * zoomCoef;
-
-        const cornerRadius = 8 * zoomCoef;
-        const edgeRadius = 4 * zoomCoef;
-
-        const minX = selectionBox.minX - padding;
-        const maxX = selectionBox.maxX + padding;
-        const minY = selectionBox.minY - padding;
-        const maxY = selectionBox.maxY + padding;
-
-        const inX = point.x >= minX && point.x <= maxX;
-        const inY = point.y >= minY && point.y <= maxY;
-        const isInside = inX && inY;
-
-        const dxMin = Math.abs(point.x - minX);
-        const dxMax = Math.abs(point.x - maxX);
-        const dyMin = Math.abs(point.y - minY);
-        const dyMax = Math.abs(point.y - maxY);
-
-        const dLT = Math.hypot(dxMin, dyMin);
-        const dRT = Math.hypot(dxMax, dyMin);
-        const dLB = Math.hypot(dxMin, dyMax);
-        const dRB = Math.hypot(dxMax, dyMax);
-
-        let minC = cornerRadius;
-        let closestCorner: ResizeHandle | null = null;
-
-        if (dLT <= minC) {
-            minC = dLT;
-            closestCorner = 'lt';
-        }
-        if (dRT <= minC) {
-            minC = dRT;
-            closestCorner = 'rt';
-        }
-        if (dLB <= minC) {
-            minC = dLB;
-            closestCorner = 'lb';
-        }
-        if (dRB <= minC) {
-            minC = dRB;
-            closestCorner = 'rb';
-        }
-
-        if (closestCorner) return { handle: closestCorner, isInside: false };
-
-        let minE = edgeRadius;
-        let closestEdge: ResizeHandle | null = null;
-
-        if (inY) {
-            if (dxMin <= minE) {
-                minE = dxMin;
-                closestEdge = 'l';
-            }
-            if (dxMax <= minE) {
-                minE = dxMax;
-                closestEdge = 'r';
-            }
-        }
-        if (inX) {
-            if (dyMin <= minE) {
-                minE = dyMin;
-                closestEdge = 't';
-            }
-            if (dyMax <= minE) {
-                minE = dyMax;
-                closestEdge = 'b';
-            }
-        }
-
-        return { handle: closestEdge, isInside };
-    }
     function onMouseDown(e: MouseEvent) {
-        const canvas = canvasRef.value;
-
         if (
             e.button === 1 ||
             (toolsStore.activeTool === 'hand' && e.button === 0)
         ) {
             e.preventDefault();
-            isPanning.value = true;
-            panStart.value = { x: e.clientX, y: e.clientY };
-            if (canvas) {
-                canvas.style.cursor = 'grabbing';
-            }
+            startPanInteraction(e);
             return;
         }
 
@@ -477,89 +560,27 @@ export function useInteractions(
         const topShape = hitTest(point);
 
         if (toolsStore.activeTool === 'eraser') {
-            if (topShape) {
-                if (canvasStore.selectedIds.includes(topShape.id)) {
-                    canvasStore.deleteSelectedShapes();
-                } else {
-                    canvasStore.deleteShape(topShape.id);
-                }
-            }
+            handleEraserInteraction(topShape);
             return;
         }
 
         if (toolsStore.activeTool === 'pencil') {
-            canvasStore.clearSelection();
-            activeShape.value = null;
-
-            isCreating.value = true;
-            createStart.value = point;
-            createToolType.value = 'pencil';
-
-            if ('creationParams' in toolsStore) {
-                const store = toolsStore as {
-                    creationParams?: Record<string, unknown> | null;
-                };
-                createParams.value = store.creationParams ?? null;
-            } else {
-                createParams.value = null;
-            }
-
-            if (!hasRecordedInteraction.value) {
-                canvasStore.startInteraction();
-                hasRecordedInteraction.value = true;
-            }
-
-            const newShape = canvasStore.addShape(
-                'pencil',
-                { x: point.x, y: point.y },
-                createParams.value ?? undefined,
-                false
-            ) as PencilShape;
-
-            newShape.stroke = toolsStore.pencilDefaults.stroke;
-            newShape.strokeOpacity = toolsStore.pencilDefaults.strokeOpacity;
-            newShape.strokeWidth = toolsStore.pencilDefaults.strokeWidth;
-
-            activeShape.value = newShape;
-
-            if (canvas) {
-                canvas.style.cursor = 'crosshair';
-            }
+            startPencilCreation(point);
             return;
         }
 
-        const creatingTools: ToolType[] = [
-            'rect',
-            'circle',
-            'line',
-            'triangle',
-            'parallelogram',
-            'polygon',
-            'star',
-            'hexagon',
-            'arrow',
-        ];
-
-        if (creatingTools.includes(toolsStore.activeTool)) {
-            canvasStore.clearSelection();
-            activeShape.value = null;
-            isCreating.value = true;
-            createStart.value = point;
-            createToolType.value = toolsStore.activeTool;
-            if ('creationParams' in toolsStore) {
-                const store = toolsStore as {
-                    creationParams?: Record<string, unknown> | null;
-                };
-                createParams.value = store.creationParams ?? null;
-            } else {
-                createParams.value = null;
-            }
+        if (SHAPE_CREATION_TOOLS.includes(toolsStore.activeTool)) {
+            beginCreation(toolsStore.activeTool, point);
             return;
         }
 
         if (toolsStore.activeTool === 'select') {
             if (canvasStore.selectedIds.length === 1 && activeShape.value) {
-                const handle = detectResizeHandle(activeShape.value, point);
+                const handle = detectResizeHandle(
+                    activeShape.value,
+                    point,
+                    zoom.value
+                );
                 if (handle) {
                     e.preventDefault();
                     isResizing.value = true;
@@ -593,18 +614,18 @@ export function useInteractions(
                             lineStartLocal.value = { ...line.localEndPoint };
                     }
 
-                    if (canvas) {
-                        canvas.style.cursor = getCursorStyle(
-                            handle,
-                            activeShape.value
-                        );
-                    }
+                    setCanvasCursor(getCursorStyle(handle, activeShape.value));
                     return;
                 }
             }
 
             if (canvasStore.selectedIds.length > 1) {
-                const { handle, isInside } = hitTestSelectionBox(point);
+                const selectionBox = getCurrentSelectionBox();
+                const { handle, isInside } = hitTestSelectionBox(
+                    point,
+                    selectionBox,
+                    zoom.value
+                );
 
                 if (handle) {
                     e.preventDefault();
@@ -632,12 +653,10 @@ export function useInteractions(
                         });
                     });
 
-                    selectionStartBox.value = getVisualSelectionBox();
+                    selectionStartBox.value = selectionBox;
                     dragStart.value = point;
 
-                    if (canvas) {
-                        canvas.style.cursor = getGlobalCursorStyle(handle);
-                    }
+                    setCanvasCursor(getGlobalCursorStyle(handle));
                     return;
                 }
 
@@ -655,11 +674,9 @@ export function useInteractions(
                         });
                     });
 
-                    selectionStartBox.value = getVisualSelectionBox();
+                    selectionStartBox.value = selectionBox;
 
-                    if (canvas) {
-                        canvas.style.cursor = 'grabbing';
-                    }
+                    setCanvasCursor('grabbing');
                     return;
                 }
             }
@@ -670,11 +687,7 @@ export function useInteractions(
                 );
 
                 if (!isSelected) {
-                    if (e.shiftKey) {
-                        canvasStore.selectShapeWithAdd(topShape.id, true);
-                    } else {
-                        canvasStore.selectShapeWithAdd(topShape.id, false);
-                    }
+                    canvasStore.selectShapeWithAdd(topShape.id, e.shiftKey);
                 }
 
                 if (
@@ -691,9 +704,7 @@ export function useInteractions(
                     activeShape.value = topShape;
                     hasMoved.value = false;
 
-                    if (canvas) {
-                        canvas.style.cursor = 'grabbing';
-                    }
+                    setCanvasCursor('grabbing');
                 }
             } else {
                 if (!e.shiftKey) {
@@ -707,8 +718,7 @@ export function useInteractions(
 
     function onMouseMove(e: MouseEvent) {
         const point = getLocalPoint(e);
-        const canvas = canvasRef.value;
-        if (!canvas) return;
+        if (!canvasRef.value) return;
 
         if (isPanning.value) {
             const dx = e.clientX - panStart.value.x;
@@ -717,7 +727,7 @@ export function useInteractions(
                 canvasStore.movePan({ x: dx, y: dy });
                 panStart.value = { x: e.clientX, y: e.clientY };
             }
-            canvas.style.cursor = 'grabbing';
+            setCanvasCursor('grabbing');
             return;
         }
 
@@ -729,18 +739,8 @@ export function useInteractions(
             const dx = point.x - dragStart.value.x;
             const dy = point.y - dragStart.value.y;
 
-            if (!hasMoved.value) {
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < DRAG_THRESHOLD) {
-                    return;
-                }
-                hasMoved.value = true;
-            }
-
-            if (!hasRecordedInteraction.value && hasMoved.value) {
-                canvasStore.startInteraction();
-                hasRecordedInteraction.value = true;
-            }
+            if (!passDragThreshold(dx, dy)) return;
+            startInteractionIfNeeded();
 
             dragStartPositions.value.forEach((startPos, id) => {
                 const shape = shapes.value.find((s) => s.id === id);
@@ -751,17 +751,10 @@ export function useInteractions(
             });
 
             if (canvasStore.selectionRect && selectionStartBox.value) {
-                canvasStore.selectionRect.start.x =
-                    selectionStartBox.value.minX + dx;
-                canvasStore.selectionRect.start.y =
-                    selectionStartBox.value.minY + dy;
-                canvasStore.selectionRect.end.x =
-                    selectionStartBox.value.maxX + dx;
-                canvasStore.selectionRect.end.y =
-                    selectionStartBox.value.maxY + dy;
+                moveSelectionRectFromStart(selectionStartBox.value, dx, dy);
             }
 
-            canvas.style.cursor = 'grabbing';
+            setCanvasCursor('grabbing');
             return;
         }
 
@@ -773,144 +766,138 @@ export function useInteractions(
             const dx = point.x - dragStart.value.x;
             const dy = point.y - dragStart.value.y;
 
-            if (!hasMoved.value) {
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < DRAG_THRESHOLD) {
-                    return;
-                }
-                hasMoved.value = true;
-            }
-
-            if (!hasRecordedInteraction.value && hasMoved.value) {
-                canvasStore.startInteraction();
-                hasRecordedInteraction.value = true;
-            }
+            if (!passDragThreshold(dx, dy)) return;
+            startInteractionIfNeeded();
 
             const handle = resizeHandle.value;
+            const handleFlags = getHandleFlags(handle);
             const shift = e.shiftKey;
             const startBox = selectionStartBox.value;
 
-            const origW = Math.max(0.1, startBox.maxX - startBox.minX);
-            const origH = Math.max(0.1, startBox.maxY - startBox.minY);
+            const origW = Math.max(MIN_RESIZE_BASE_SIZE, startBox.maxX - startBox.minX);
+            const origH = Math.max(MIN_RESIZE_BASE_SIZE, startBox.maxY - startBox.minY);
 
-            let hasRotated = false;
-            multiResizeStates.value.forEach((state) => {
-                if (Math.abs(state.shape.rotation % 180) > 0) {
-                    hasRotated = true;
-                }
-            });
+            const forceProportional =
+                shift || hasRotatedShapes(multiResizeStates.value);
 
-            const forceProportional = shift || hasRotated;
-
-            let newMinX = startBox.minX,
-                newMaxX = startBox.maxX;
-            let newMinY = startBox.minY,
-                newMaxY = startBox.maxY;
+            let rawMinX = startBox.minX,
+                rawMaxX = startBox.maxX;
+            let rawMinY = startBox.minY,
+                rawMaxY = startBox.maxY;
 
             if (forceProportional) {
-                const ratioX = handle.includes('l')
-                    ? (startBox.maxX - point.x) / origW
-                    : handle.includes('r')
-                      ? (point.x - startBox.minX) / origW
-                      : 1;
+                const ratioX = resolveAxisRatio(
+                    point.x,
+                    startBox.minX,
+                    startBox.maxX,
+                    origW,
+                    handleFlags.left,
+                    handleFlags.right
+                );
+                const ratioY = resolveAxisRatio(
+                    point.y,
+                    startBox.minY,
+                    startBox.maxY,
+                    origH,
+                    handleFlags.top,
+                    handleFlags.bottom
+                );
 
-                const ratioY = handle.includes('t')
-                    ? (startBox.maxY - point.y) / origH
-                    : handle.includes('b')
-                      ? (point.y - startBox.minY) / origH
-                      : 1;
+                let ratio = resolveProportionalRatio(
+                    ratioX,
+                    ratioY,
+                    handleFlags
+                );
 
-                let ratio = 1;
-                if (['l', 'r'].includes(handle)) {
-                    ratio = Math.abs(ratioX);
-                } else if (['t', 'b'].includes(handle)) {
-                    ratio = Math.abs(ratioY);
-                } else {
-                    ratio = Math.max(Math.abs(ratioX), Math.abs(ratioY));
-                }
-
-                ratio = Math.max(0.01, ratio);
+                ratio = Math.max(MIN_PROPORTIONAL_RATIO, ratio);
 
                 const dirX = Math.sign(ratioX) || 1;
                 const dirY = Math.sign(ratioY) || 1;
+                const xBounds = resolveProportionalAxisBounds(
+                    startBox.minX,
+                    startBox.maxX,
+                    origW,
+                    ratio,
+                    dirX,
+                    handleFlags.left,
+                    handleFlags.right
+                );
+                const yBounds = resolveProportionalAxisBounds(
+                    startBox.minY,
+                    startBox.maxY,
+                    origH,
+                    ratio,
+                    dirY,
+                    handleFlags.top,
+                    handleFlags.bottom
+                );
 
-                if (handle.includes('l')) {
-                    newMinX = startBox.maxX - origW * ratio * dirX;
-                } else if (handle.includes('r')) {
-                    newMaxX = startBox.minX + origW * ratio * dirX;
-                } else {
-                    const halfW = (origW * ratio) / 2;
-                    const cx = (startBox.minX + startBox.maxX) / 2;
-                    newMinX = cx - halfW;
-                    newMaxX = cx + halfW;
-                }
-
-                if (handle.includes('t')) {
-                    newMinY = startBox.maxY - origH * ratio * dirY;
-                } else if (handle.includes('b')) {
-                    newMaxY = startBox.minY + origH * ratio * dirY;
-                } else {
-                    const halfH = (origH * ratio) / 2;
-                    const cy = (startBox.minY + startBox.maxY) / 2;
-                    newMinY = cy - halfH;
-                    newMaxY = cy + halfH;
-                }
+                rawMinX = xBounds.min;
+                rawMaxX = xBounds.max;
+                rawMinY = yBounds.min;
+                rawMaxY = yBounds.max;
             } else {
                 const deltaX = point.x - dragStart.value.x;
                 const deltaY = point.y - dragStart.value.y;
+                const xBounds = resolveFreeAxisBounds(
+                    startBox.minX,
+                    startBox.maxX,
+                    deltaX,
+                    handleFlags.left,
+                    handleFlags.right
+                );
+                const yBounds = resolveFreeAxisBounds(
+                    startBox.minY,
+                    startBox.maxY,
+                    deltaY,
+                    handleFlags.top,
+                    handleFlags.bottom
+                );
 
-                if (handle.includes('l')) newMinX = startBox.minX + deltaX;
-                if (handle.includes('r')) newMaxX = startBox.maxX + deltaX;
-                if (handle.includes('t')) newMinY = startBox.minY + deltaY;
-                if (handle.includes('b')) newMaxY = startBox.maxY + deltaY;
+                rawMinX = xBounds.min;
+                rawMaxX = xBounds.max;
+                rawMinY = yBounds.min;
+                rawMaxY = yBounds.max;
             }
 
-            let signX = 1;
-            let signY = 1;
+            const normalizedBounds = normalizeBounds(
+                rawMinX,
+                rawMaxX,
+                rawMinY,
+                rawMaxY
+            );
 
-            if (newMinX > newMaxX) {
-                signX = -1;
-                [newMinX, newMaxX] = [newMaxX, newMinX];
-            }
-            if (newMinY > newMaxY) {
-                signY = -1;
-                [newMinY, newMaxY] = [newMaxY, newMinY];
-            }
-
-            const newWidth = Math.max(1, newMaxX - newMinX);
-            const newHeight = Math.max(1, newMaxY - newMinY);
-
-            const absScaleX = newWidth / origW;
-            const absScaleY = newHeight / origH;
+            const absScaleX = normalizedBounds.width / origW;
+            const absScaleY = normalizedBounds.height / origH;
+            const oldCenterX = (startBox.minX + startBox.maxX) / 2;
+            const oldCenterY = (startBox.minY + startBox.maxY) / 2;
+            const newCenterX =
+                (normalizedBounds.minX + normalizedBounds.maxX) / 2;
+            const newCenterY =
+                (normalizedBounds.minY + normalizedBounds.maxY) / 2;
 
             multiResizeStates.value.forEach((state) => {
                 const shape = state.shape;
 
-                const oldCenterX = (startBox.minX + startBox.maxX) / 2;
-                const oldCenterY = (startBox.minY + startBox.maxY) / 2;
-
-                const newCenterX = (newMinX + newMaxX) / 2;
-                const newCenterY = (newMinY + newMaxY) / 2;
-
                 const relX = (state.startPosition.x - oldCenterX) / (origW / 2);
                 const relY = (state.startPosition.y - oldCenterY) / (origH / 2);
 
-                shape.position.x = newCenterX + relX * signX * (newWidth / 2);
-                shape.position.y = newCenterY + relY * signY * (newHeight / 2);
+                shape.position.x =
+                    newCenterX +
+                    relX * normalizedBounds.signX * (normalizedBounds.width / 2);
+                shape.position.y =
+                    newCenterY +
+                    relY * normalizedBounds.signY * (normalizedBounds.height / 2);
 
-                shape.scaleX = state.startScale.x * signX;
-                shape.scaleY = state.startScale.y * signY;
+                shape.scaleX = state.startScale.x * normalizedBounds.signX;
+                shape.scaleY = state.startScale.y * normalizedBounds.signY;
 
                 if (shape.type !== 'line') {
-                    let newRot = state.startRotation;
-
-                    if (signX === -1) {
-                        newRot = (360 - newRot) % 360;
-                    }
-                    if (signY === -1) {
-                        newRot = (360 - newRot) % 360;
-                    }
-                    shape.rotation = newRot;
+                    shape.rotation = applyFlipRotation(
+                        state.startRotation,
+                        normalizedBounds.signX === -1,
+                        normalizedBounds.signY === -1
+                    );
 
                     const localBox = state.startLocalBox;
                     const newLocalWidth =
@@ -918,8 +905,8 @@ export function useInteractions(
                     const newLocalHeight =
                         (localBox.maxY - localBox.minY) * absScaleY;
                     shape.setSize(
-                        Math.max(1, newLocalWidth),
-                        Math.max(1, newLocalHeight)
+                        Math.max(MIN_SHAPE_SIZE, newLocalWidth),
+                        Math.max(MIN_SHAPE_SIZE, newLocalHeight)
                     );
                 } else {
                     const line = shape as LineShape;
@@ -932,12 +919,14 @@ export function useInteractions(
                 }
             });
 
-            if (canvasStore.selectionRect) {
-                canvasStore.selectionRect.start = { x: newMinX, y: newMinY };
-                canvasStore.selectionRect.end = { x: newMaxX, y: newMaxY };
-            }
+            updateSelectionRectBounds(
+                normalizedBounds.minX,
+                normalizedBounds.minY,
+                normalizedBounds.maxX,
+                normalizedBounds.maxY
+            );
 
-            canvas.style.cursor = getGlobalCursorStyle(handle);
+            setCanvasCursor(getGlobalCursorStyle(handle));
             return;
         }
 
@@ -961,12 +950,12 @@ export function useInteractions(
                     Math.hypot(
                         localPoint.x - lastPoint.x,
                         localPoint.y - lastPoint.y
-                    ) >= 1
+                    ) >= MIN_PENCIL_POINT_DISTANCE
                 ) {
                     pencil.addPoint(point);
                 }
 
-                canvas.style.cursor = 'crosshair';
+                setCanvasCursor('crosshair');
                 return;
             }
 
@@ -977,18 +966,14 @@ export function useInteractions(
             let dy = current.y - start.y;
             const distanceSq = dx * dx + dy * dy;
 
-            const MIN_DRAG_DISTANCE_SQ = 4;
-            if (distanceSq < MIN_DRAG_DISTANCE_SQ) {
+            if (distanceSq < MIN_CREATE_DRAG_DISTANCE_SQ) {
                 return;
             }
 
             if (!activeShape.value) {
                 if (!createToolType.value) return;
 
-                if (!hasRecordedInteraction.value) {
-                    canvasStore.startInteraction();
-                    hasRecordedInteraction.value = true;
-                }
+                startInteractionIfNeeded();
 
                 const newShape = canvasStore.addShape(
                     createToolType.value,
@@ -1002,14 +987,16 @@ export function useInteractions(
             }
 
             if (!activeShape.value) return;
+            const shape = activeShape.value;
 
             if (e.shiftKey) {
-                if (activeShape.value.type === 'line') {
+                if (shape.type === 'line') {
                     const length = Math.sqrt(distanceSq);
                     if (length > 0) {
                         const angle = Math.atan2(dy, dx);
                         const snap =
-                            Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+                            Math.round(angle / LINE_SNAP_ANGLE_STEP) *
+                            LINE_SNAP_ANGLE_STEP;
                         dx = length * Math.cos(snap);
                         dy = length * Math.sin(snap);
                         current = { x: start.x + dx, y: start.y + dy };
@@ -1024,46 +1011,43 @@ export function useInteractions(
                 }
             }
 
-            if (activeShape.value.type === 'line') {
-                const line = activeShape.value as LineShape;
+            if (shape.type === 'line') {
+                const line = shape as LineShape;
                 line.position = { x: start.x, y: start.y };
                 line.localEndPoint = {
                     x: current.x - start.x,
                     y: current.y - start.y,
                 };
             } else {
-                const width = Math.max(1, Math.abs(current.x - start.x));
-                const height = Math.max(1, Math.abs(current.y - start.y));
+                const width = Math.max(
+                    MIN_SHAPE_SIZE,
+                    Math.abs(current.x - start.x)
+                );
+                const height = Math.max(
+                    MIN_SHAPE_SIZE,
+                    Math.abs(current.y - start.y)
+                );
                 const centerX = (start.x + current.x) / 2;
                 const centerY = (start.y + current.y) / 2;
 
-                activeShape.value.position = { x: centerX, y: centerY };
-                activeShape.value.setSize(width, height);
+                shape.position = { x: centerX, y: centerY };
+                shape.setSize(width, height);
             }
 
-            canvas.style.cursor = 'crosshair';
+            setCanvasCursor('crosshair');
             return;
         }
 
         if (isResizing.value && activeShape.value && resizeHandle.value) {
             const handle = resizeHandle.value;
+            const handleFlags = getHandleFlags(handle);
             const shift = e.shiftKey;
 
             const dx = point.x - dragStart.value.x;
             const dy = point.y - dragStart.value.y;
 
-            if (!hasMoved.value) {
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < DRAG_THRESHOLD) {
-                    return;
-                }
-                hasMoved.value = true;
-            }
-
-            if (!hasRecordedInteraction.value && hasMoved.value) {
-                canvasStore.startInteraction();
-                hasRecordedInteraction.value = true;
-            }
+            if (!passDragThreshold(dx, dy)) return;
+            startInteractionIfNeeded();
 
             if (handle === 'rot') {
                 const center = activeShape.value.position;
@@ -1083,10 +1067,13 @@ export function useInteractions(
                 const deltaDeg = normalizedDelta * (180 / Math.PI);
 
                 activeShape.value.rotation =
-                    (activeShape.value.rotation + deltaDeg + 360) % 360;
+                    (activeShape.value.rotation +
+                        deltaDeg +
+                        FULL_ROTATION_DEGREES) %
+                    FULL_ROTATION_DEGREES;
                 rotateLastPointerAngle.value = angle;
 
-                canvas.style.cursor = getCursorStyle(handle, activeShape.value);
+                setCanvasCursor(getCursorStyle(handle, activeShape.value));
                 return;
             }
 
@@ -1110,10 +1097,7 @@ export function useInteractions(
                 activeShape.value.type === 'line' &&
                 (handle === 's' || handle === 'e')
             ) {
-                if (!hasRecordedInteraction.value) {
-                    canvasStore.startInteraction();
-                    hasRecordedInteraction.value = true;
-                }
+                startInteractionIfNeeded();
                 const line = activeShape.value as LineShape;
 
                 if (lineStartLocal.value) {
@@ -1138,14 +1122,11 @@ export function useInteractions(
                         };
                     }
                 }
-                canvas.style.cursor = 'crosshair';
+                setCanvasCursor('crosshair');
                 return;
             }
 
-            if (!hasRecordedInteraction.value) {
-                canvasStore.startInteraction();
-                hasRecordedInteraction.value = true;
-            }
+            startInteractionIfNeeded();
             let nMinX = startBox.minX,
                 nMaxX = startBox.maxX;
             let nMinY = startBox.minY,
@@ -1154,22 +1135,18 @@ export function useInteractions(
             let moveX = localMouse.x;
             let moveY = localMouse.y;
 
-            if (shift && ['lt', 'rt', 'lb', 'rb'].includes(handle)) {
+            if (shift && isCornerHandle(handleFlags)) {
                 const origW = startBox.maxX - startBox.minX;
                 const origH = startBox.maxY - startBox.minY;
 
-                const fixedX = handle.includes('l')
-                    ? startBox.maxX
-                    : startBox.minX;
-                const fixedY = handle.includes('t')
-                    ? startBox.maxY
-                    : startBox.minY;
+                const fixedX = handleFlags.left ? startBox.maxX : startBox.minX;
+                const fixedY = handleFlags.top ? startBox.maxY : startBox.minY;
 
                 const deltaX = localMouse.x - fixedX;
                 const deltaY = localMouse.y - fixedY;
                 const kx = origW === 0 ? 1 : Math.abs(deltaX) / origW;
                 const ky = origH === 0 ? 1 : Math.abs(deltaY) / origH;
-                const ratio = Math.max(kx, ky, 0.01);
+                const ratio = Math.max(kx, ky, MIN_PROPORTIONAL_RATIO);
 
                 moveX = fixedX + Math.sign(deltaX || 1) * origW * ratio;
                 moveY = fixedY + Math.sign(deltaY || 1) * origH * ratio;
@@ -1179,25 +1156,31 @@ export function useInteractions(
                 nMinY = Math.min(fixedY, moveY);
                 nMaxY = Math.max(fixedY, moveY);
             } else {
-                if (handle.includes('l')) {
+                const xBounds = resolveAxisBoundsFromPointer(
+                    localMouse.x,
+                    startBox.minX,
+                    startBox.maxX,
+                    handleFlags.left,
+                    handleFlags.right
+                );
+                const yBounds = resolveAxisBoundsFromPointer(
+                    localMouse.y,
+                    startBox.minY,
+                    startBox.maxY,
+                    handleFlags.top,
+                    handleFlags.bottom
+                );
+
+                nMinX = xBounds.min;
+                nMaxX = xBounds.max;
+                nMinY = yBounds.min;
+                nMaxY = yBounds.max;
+
+                if (handleFlags.left || handleFlags.right) {
                     moveX = localMouse.x;
-                    nMinX = Math.min(startBox.maxX, moveX);
-                    nMaxX = Math.max(startBox.maxX, moveX);
                 }
-                if (handle.includes('r')) {
-                    moveX = localMouse.x;
-                    nMinX = Math.min(startBox.minX, moveX);
-                    nMaxX = Math.max(startBox.minX, moveX);
-                }
-                if (handle.includes('t')) {
+                if (handleFlags.top || handleFlags.bottom) {
                     moveY = localMouse.y;
-                    nMinY = Math.min(startBox.maxY, moveY);
-                    nMaxY = Math.max(startBox.maxY, moveY);
-                }
-                if (handle.includes('b')) {
-                    moveY = localMouse.y;
-                    nMinY = Math.min(startBox.minY, moveY);
-                    nMaxY = Math.max(startBox.minY, moveY);
                 }
             }
 
@@ -1205,8 +1188,8 @@ export function useInteractions(
             const newHeight = Math.abs(nMaxY - nMinY);
 
             activeShape.value.setSize(
-                Math.max(1, newWidth),
-                Math.max(1, newHeight)
+                Math.max(MIN_SHAPE_SIZE, newWidth),
+                Math.max(MIN_SHAPE_SIZE, newHeight)
             );
 
             const localCenterX = (nMinX + nMaxX) / 2;
@@ -1222,27 +1205,21 @@ export function useInteractions(
             const startScaleX = resizeStartScale.value.x;
             const startScaleY = resizeStartScale.value.y;
 
-            if (handle.includes('l') || handle.includes('r')) {
-                const fixedX = handle.includes('l')
-                    ? startBox.maxX
-                    : startBox.minX;
-                const expectedDir = handle.includes('l') ? -1 : 1;
-                const actualDir = Math.sign(moveX - fixedX) || expectedDir;
-                const signX = actualDir === expectedDir ? 1 : -1;
+            if (handleFlags.left || handleFlags.right) {
+                const fixedX = handleFlags.left ? startBox.maxX : startBox.minX;
+                const expectedDir: -1 | 1 = handleFlags.left ? -1 : 1;
+                const signX = resolveScaleSign(moveX, fixedX, expectedDir);
                 activeShape.value.scaleX = startScaleX * signX;
             }
 
-            if (handle.includes('t') || handle.includes('b')) {
-                const fixedY = handle.includes('t')
-                    ? startBox.maxY
-                    : startBox.minY;
-                const expectedDir = handle.includes('t') ? -1 : 1;
-                const actualDir = Math.sign(moveY - fixedY) || expectedDir;
-                const signY = actualDir === expectedDir ? 1 : -1;
+            if (handleFlags.top || handleFlags.bottom) {
+                const fixedY = handleFlags.top ? startBox.maxY : startBox.minY;
+                const expectedDir: -1 | 1 = handleFlags.top ? -1 : 1;
+                const signY = resolveScaleSign(moveY, fixedY, expectedDir);
                 activeShape.value.scaleY = startScaleY * signY;
             }
 
-            canvas.style.cursor = getCursorStyle(handle, activeShape.value);
+            setCanvasCursor(getCursorStyle(handle, activeShape.value));
             return;
         }
 
@@ -1250,127 +1227,64 @@ export function useInteractions(
             const dx = point.x - dragStart.value.x;
             const dy = point.y - dragStart.value.y;
 
-            if (!hasMoved.value) {
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < DRAG_THRESHOLD) {
-                    return;
-                }
-                hasMoved.value = true;
-            }
-
-            if (!hasRecordedInteraction.value && hasMoved.value) {
-                canvasStore.startInteraction();
-                hasRecordedInteraction.value = true;
-            }
+            if (!passDragThreshold(dx, dy)) return;
+            startInteractionIfNeeded();
 
             activeShape.value.position.x = dragStartPosition.value.x + dx;
             activeShape.value.position.y = dragStartPosition.value.y + dy;
 
-            canvas.style.cursor = 'grabbing';
+            setCanvasCursor('grabbing');
             return;
         }
 
         if (canvasStore.selectedIds.length > 0 && canvasStore.selectionRect) {
-            const selectionBox = {
-                minX: Math.min(
-                    canvasStore.selectionRect.start.x,
-                    canvasStore.selectionRect.end.x
-                ),
-                minY: Math.min(
-                    canvasStore.selectionRect.start.y,
-                    canvasStore.selectionRect.end.y
-                ),
-                maxX: Math.max(
-                    canvasStore.selectionRect.start.x,
-                    canvasStore.selectionRect.end.x
-                ),
-                maxY: Math.max(
-                    canvasStore.selectionRect.start.y,
-                    canvasStore.selectionRect.end.y
-                ),
-            };
-            const zoomCoef = (1 / zoom.value) * 100;
+            const selectionBox = getCurrentSelectionBox();
+            const { handle, isInside } = hitTestSelectionBox(
+                point,
+                selectionBox,
+                zoom.value
+            );
 
-            const padding = SELECTION_PADDING * zoomCoef;
-            const edgeThreshold = 8 * zoomCoef;
-
-            const expandedBox = {
-                minX: selectionBox.minX - padding,
-                maxX: selectionBox.maxX + padding,
-                minY: selectionBox.minY - padding,
-                maxY: selectionBox.maxY + padding,
-            };
-
-            const nearLeft =
-                Math.abs(point.x - selectionBox.minX) <= edgeThreshold;
-            const nearRight =
-                Math.abs(point.x - selectionBox.maxX) <= edgeThreshold;
-            const nearTop =
-                Math.abs(point.y - selectionBox.minY) <= edgeThreshold;
-            const nearBottom =
-                Math.abs(point.y - selectionBox.maxY) <= edgeThreshold;
-
-            const inY =
-                point.y >= expandedBox.minY && point.y <= expandedBox.maxY;
-            const inX =
-                point.x >= expandedBox.minX && point.x <= expandedBox.maxX;
-            const isInside =
-                point.x >= expandedBox.minX &&
-                point.x <= expandedBox.maxX &&
-                point.y >= expandedBox.minY &&
-                point.y <= expandedBox.maxY;
+            if (handle) {
+                setCanvasCursor(getGlobalCursorStyle(handle));
+                return;
+            }
 
             if (isInside) {
-                let cursorHandle: ResizeHandle | null = null;
-
-                if (nearLeft && nearTop) cursorHandle = 'lt';
-                else if (nearRight && nearTop) cursorHandle = 'rt';
-                else if (nearLeft && nearBottom) cursorHandle = 'lb';
-                else if (nearRight && nearBottom) cursorHandle = 'rb';
-                else if (nearLeft && inY) cursorHandle = 'l';
-                else if (nearRight && inY) cursorHandle = 'r';
-                else if (nearTop && inX) cursorHandle = 't';
-                else if (nearBottom && inX) cursorHandle = 'b';
-
-                if (cursorHandle) {
-                    canvas.style.cursor = getGlobalCursorStyle(cursorHandle);
-                    return;
-                }
-
-                canvas.style.cursor = 'grab';
+                setCanvasCursor('grab');
                 return;
             }
         }
 
         if (activeShape.value && canvasStore.selectedIds.length === 1) {
-            const handle = detectResizeHandle(activeShape.value, point);
+            const handle = detectResizeHandle(
+                activeShape.value,
+                point,
+                zoom.value
+            );
             if (handle) {
-                canvas.style.cursor = getCursorStyle(handle, activeShape.value);
+                setCanvasCursor(getCursorStyle(handle, activeShape.value));
                 return;
             }
         }
 
         const topShape = hitTest(point);
         if (toolsStore.activeTool === 'hand') {
-            canvas.style.cursor = 'grab';
+            setCanvasCursor('grab');
             return;
         }
 
         if (toolsStore.activeTool === 'select') {
-            canvas.style.cursor = topShape ? 'grab' : 'default';
+            setCanvasCursor(topShape ? 'grab' : 'default');
         } else {
-            canvas.style.cursor = 'default';
+            setCanvasCursor('default');
         }
     }
 
     function onMouseUp(e: MouseEvent) {
         if (isPanning.value) {
             isPanning.value = false;
-            const canvas = canvasRef.value;
-            if (canvas) {
-                canvas.style.cursor =
-                    toolsStore.activeTool === 'hand' ? 'grab' : 'default';
-            }
+            setCanvasCursor(toolsStore.activeTool === 'hand' ? 'grab' : 'default');
             return;
         }
 
@@ -1381,8 +1295,6 @@ export function useInteractions(
                 const singleId = canvasStore.selectedIds[0];
 
                 if (singleId) canvasStore.selectShape(singleId);
-
-                canvasStore.selectionRect = null;
             }
         }
 
@@ -1395,65 +1307,34 @@ export function useInteractions(
                     pencil.recenterToBoundingBox();
                 }
 
-                if (hasRecordedInteraction.value) {
-                    canvasStore.endInteraction();
-                    hasRecordedInteraction.value = false;
-                }
+                endInteractionIfNeeded();
 
                 canvasStore.clearSelection();
                 activeShape.value = null;
-
-                if ('setCreationParams' in toolsStore) {
-                    const store = toolsStore as {
-                        setCreationParams?: (
-                            params: Record<string, unknown> | null
-                        ) => void;
-                    };
-                    store.setCreationParams?.(null);
-                }
+                clearToolCreationParams();
             }
 
-            isCreating.value = false;
-            createStart.value = null;
-            createToolType.value = null;
-            createParams.value = null;
-            const canvas = canvasRef.value;
-            if (canvas) {
-                canvas.style.cursor = 'default';
-            }
+            resetCreationState();
+            setCanvasCursor('default');
             return;
         }
 
-        if (isDraggingMultiple.value || isResizingMultiple.value) {
-            if (hasRecordedInteraction.value) {
-                canvasStore.endInteraction();
-                hasRecordedInteraction.value = false;
-            }
-            isDraggingMultiple.value = false;
-            isResizingMultiple.value = false;
-            multiResizeStates.value.clear();
-            selectionStartBox.value = null;
-            dragStartPositions.value.clear();
+        if (
+            isDraggingMultiple.value ||
+            isResizingMultiple.value ||
+            hasMoved.value
+        ) {
+            endInteractionIfNeeded();
         }
 
-        if (hasMoved.value) {
-            if (hasRecordedInteraction.value) {
-                canvasStore.endInteraction();
-                hasRecordedInteraction.value = false;
-            }
+        if (isDraggingMultiple.value || isResizingMultiple.value) {
+            resetMultiSelectionState();
         }
 
         hasMoved.value = false;
         hasRecordedInteraction.value = false;
         isDragging.value = false;
-        isResizing.value = false;
-        resizeHandle.value = null;
-        resizeStartLocalBox.value = null;
-        resizeStartMatrix.value = null;
-        resizeStartInverse.value = null;
-        resizeStartRotation.value = 0;
-        rotateLastPointerAngle.value = null;
-        lineStartLocal.value = null;
+        resetResizeState();
 
         onMouseMove(e);
     }

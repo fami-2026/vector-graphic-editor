@@ -53,7 +53,6 @@ export class PencilShape extends BaseShape {
     // После рисования переносим центр в position (0,0 в локале)
     recenterToBoundingBox() {
         if (!this.points.length) return;
-        /*const box = this.getLocalBox();*/
         const box = this.getStrokeBounds();
         const cx = (box.minX + box.maxX) / 2;
         const cy = (box.minY + box.maxY) / 2;
@@ -84,30 +83,25 @@ export class PencilShape extends BaseShape {
     }
 
     get width(): number {
-        //const box = this.getLocalBox();
         const box = this.getStrokeBounds();
         return Math.max(1, Math.round(box.maxX - box.minX));
     }
 
     set width(value: number) {
-        //this.setSize(value, this.height);
         this.setSize(Math.max(1, Math.round(value)), this.height);
     }
 
     get height(): number {
-        //const box = this.getLocalBox();
         const box = this.getStrokeBounds();
         return Math.max(1, Math.round(box.maxY - box.minY));
     }
 
     set height(value: number) {
-        //this.setSize(this.width, value);
         this.setSize(this.width, Math.max(1, Math.round(value)));
     }
 
     setSize(width: number, height: number): void {
         if (!this.points.length) return;
-        //const box = this.getLocalBox();
         const box = this.getStrokeBounds();
         const curW = Math.max(1, box.maxX - box.minX);
         const curH = Math.max(1, box.maxY - box.minY);
@@ -174,21 +168,6 @@ export class PencilShape extends BaseShape {
         return minDist <= threshold;
     }
 
-    // getLocalBox(): BoundingBox {
-    //     if (!this.points.length) {
-    //         return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-    //     }
-    //     const xs = this.points.map((p) => p.x);
-    //     const ys = this.points.map((p) => p.y);
-    //     const padding = this.strokeWidth / 2 + 5;
-    //     return {
-    //         minX: Math.min(...xs) - padding,
-    //         minY: Math.min(...ys) - padding,
-    //         maxX: Math.max(...xs) + padding,
-    //         maxY: Math.max(...ys) + padding,
-    //     };
-    // }
-
     getLocalBox(): BoundingBox {
         return this.getStrokeBounds();
     }
@@ -230,14 +209,6 @@ export class PencilShape extends BaseShape {
         ctx.globalAlpha = this.strokeOpacity;
 
         ctx.beginPath();
-        //ctx.moveTo(p0.x * this.scaleX, p0.y * this.scaleY);
-
-        // for (let i = 1; i < this.points.length; i++) {
-        //     const p = this.points[i];
-        //     if (!p) continue;
-
-        //     ctx.lineTo(p.x * this.scaleX, p.y * this.scaleY);
-        // }
 
         if (this.points.length === 1) {
             ctx.moveTo(p0.x * this.scaleX, p0.y * this.scaleY);

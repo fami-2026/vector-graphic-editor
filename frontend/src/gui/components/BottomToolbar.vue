@@ -20,43 +20,46 @@ import {
 import { useToolsStore, type ToolType } from '@/stores/tools';
 import { useCanvasStore } from '@/stores/canvas';
 import { storeToRefs } from 'pinia';
-
-type ToolId =
-    | 'hand'
-    | 'cursor'
-    | 'line'
-    | 'rect'
-    | 'circle'
-    | 'triangle'
-    | 'polygon'
-    | 'star'
-    | 'hexagon'
-    | 'parallelogram'
-    | 'arrow'
-    | 'eraser'
-    | 'pencil';
+import {
+    POLYGON_SIDES_LIMITS,
+    TOOLBAR_TOOLS,
+    TOOLBAR_TOOL_ID_BY_TOOL,
+    getToolTitle,
+    type ToolbarToolClickMode,
+    type ToolbarToolId,
+} from '@/config/tools';
 
 type Tool = {
-    id: ToolId;
+    id: ToolbarToolId;
     title: string;
     icon: Component;
+    activeTool: ToolType;
+    clickMode: ToolbarToolClickMode;
 };
 
-const tools: Tool[] = [
-    { id: 'hand', title: 'Рука', icon: Hand },
-    { id: 'cursor', title: 'Курсор', icon: MousePointer2 },
-    { id: 'line', title: 'Линия', icon: Minus },
-    { id: 'rect', title: 'Прямоугольник', icon: Square },
-    { id: 'circle', title: 'Круг', icon: Circle },
-    { id: 'triangle', title: 'Треугольник', icon: Triangle },
-    { id: 'polygon', title: 'Многоугольник', icon: Pentagon },
-    { id: 'star', title: 'Звезда', icon: Star },
-    { id: 'hexagon', title: 'Шестиугольник', icon: Hexagon },
-    { id: 'parallelogram', title: 'Параллелограмм', icon: Diamond },
-    { id: 'arrow', title: 'Стрелка', icon: ArrowUp },
-    { id: 'eraser', title: 'Ластик', icon: Eraser },
-    { id: 'pencil', title: 'Карандаш', icon: Pencil },
-];
+const TOOL_ICON_BY_ID: Readonly<Record<ToolbarToolId, Component>> = {
+    hand: Hand,
+    cursor: MousePointer2,
+    line: Minus,
+    rect: Square,
+    circle: Circle,
+    triangle: Triangle,
+    polygon: Pentagon,
+    star: Star,
+    hexagon: Hexagon,
+    parallelogram: Diamond,
+    arrow: ArrowUp,
+    eraser: Eraser,
+    pencil: Pencil,
+};
+
+const tools: Tool[] = TOOLBAR_TOOLS.map((entry) => ({
+    id: entry.id,
+    title: getToolTitle(entry.tool),
+    icon: TOOL_ICON_BY_ID[entry.id],
+    activeTool: entry.tool,
+    clickMode: ('clickMode' in entry ? entry.clickMode : undefined) ?? 'activate',
+}));
 
 const toolsStore = useToolsStore();
 
@@ -68,8 +71,19 @@ const canDuplicate = computed(() => {
 
 // Состояние для диалога многоугольника
 const showPolygonDialog = ref(false);
-const polygonSides = ref(5);
+const polygonSides = ref(POLYGON_SIDES_LIMITS.defaultValue);
 const polygonInputRef = ref<HTMLInputElement | null>(null);
+
+const TOOL_CLICK_HANDLERS: Readonly<
+    Record<ToolbarToolClickMode, (tool: Tool) => void>
+> = {
+    activate: (tool) => {
+        toolsStore.setActiveTool(tool.activeTool);
+    },
+    'polygon-dialog': () => {
+        showPolygonDialog.value = true;
+    },
+};
 
 const polygonError = computed(() => {
     const sides = Number(polygonSides.value);
@@ -78,8 +92,13 @@ const polygonError = computed(() => {
         return 'Введите целое число';
     }
 
-    if (sides < 3 || sides > 20) {
-        return 'Количество углов должно быть от 3 до 20';
+    if (sides < POLYGON_SIDES_LIMITS.min || sides > POLYGON_SIDES_LIMITS.max) {
+        return (
+            'Количество углов должно быть от ' +
+            POLYGON_SIDES_LIMITS.min +
+            ' до ' +
+            POLYGON_SIDES_LIMITS.max
+        );
     }
 
     return '';
@@ -89,7 +108,7 @@ const isPolygonValid = computed(() => polygonError.value === '');
 
 watch(showPolygonDialog, async (isOpen) => {
     if (isOpen) {
-        polygonSides.value = 5;
+        polygonSides.value = POLYGON_SIDES_LIMITS.defaultValue;
 
         await nextTick();
         polygonInputRef.value?.focus();
@@ -98,68 +117,29 @@ watch(showPolygonDialog, async (isOpen) => {
 });
 
 function handleClick(tool: Tool) {
-    switch (tool.id) {
-        case 'cursor':
-            toolsStore.setActiveTool('select');
-            break;
-        case 'hand':
-            toolsStore.setActiveTool('hand');
-            break;
-        case 'rect':
-            toolsStore.setActiveTool('rect');
-            break;
-        case 'circle':
-            toolsStore.setActiveTool('circle');
-            break;
-        case 'line':
-            toolsStore.setActiveTool('line');
-            break;
-        case 'triangle':
-            toolsStore.setActiveTool('triangle');
-            break;
-        case 'polygon':
-            // Показываем диалог для выбора количества углов
-            showPolygonDialog.value = true;
-            break;
-        case 'star':
-            toolsStore.setActiveTool('star');
-            break;
-        case 'hexagon':
-            toolsStore.setActiveTool('hexagon');
-            break;
-        case 'parallelogram':
-            toolsStore.setActiveTool('parallelogram');
-            break;
-        case 'arrow':
-            toolsStore.setActiveTool('arrow');
-            break;
-        case 'eraser':
-            toolsStore.setActiveTool('eraser');
-            break;
-        case 'pencil':
-            toolsStore.setActiveTool('pencil');
-            break;
-        default:
-            toolsStore.setActiveTool('select');
-    }
+    TOOL_CLICK_HANDLERS[tool.clickMode](tool);
 }
 
 function closePolygonDialog() {
     showPolygonDialog.value = false;
-    polygonSides.value = 5;
+    polygonSides.value = POLYGON_SIDES_LIMITS.defaultValue;
 }
 
 function createPolygon() {
     const sides = Number(polygonSides.value);
 
-    if (!Number.isInteger(sides) || sides < 3 || sides > 20) {
+    if (
+        !Number.isInteger(sides) ||
+        sides < POLYGON_SIDES_LIMITS.min ||
+        sides > POLYGON_SIDES_LIMITS.max
+    ) {
         return;
     }
 
     toolsStore.setCreationParams({ sides: polygonSides.value });
     toolsStore.setActiveTool('polygon');
     showPolygonDialog.value = false;
-    polygonSides.value = 5;
+    polygonSides.value = POLYGON_SIDES_LIMITS.defaultValue;
 }
 
 function handleDuplicate() {
@@ -167,21 +147,8 @@ function handleDuplicate() {
     canvasStore.duplicateSelectedShape();
 }
 
-const activeId = computed<ToolId>(() => {
-    const active: ToolType = toolsStore.activeTool;
-    if (active === 'hand') return 'hand';
-    if (active === 'rect') return 'rect';
-    if (active === 'circle') return 'circle';
-    if (active === 'line') return 'line';
-    if (active === 'triangle') return 'triangle';
-    if (active === 'polygon') return 'polygon';
-    if (active === 'star') return 'star';
-    if (active === 'hexagon') return 'hexagon';
-    if (active === 'parallelogram') return 'parallelogram';
-    if (active === 'arrow') return 'arrow';
-    if (active === 'eraser') return 'eraser';
-    if (active === 'pencil') return 'pencil';
-    return 'cursor';
+const activeId = computed<ToolbarToolId>(() => {
+    return TOOLBAR_TOOL_ID_BY_TOOL[toolsStore.activeTool] ?? 'cursor';
 });
 </script>
 
@@ -231,7 +198,7 @@ const activeId = computed<ToolId>(() => {
 
                     <div class="form-group">
                         <label for="polygon-sides-input">
-                            Количество углов (3–20):
+                            Количество углов ({{ POLYGON_SIDES_LIMITS.min }}–{{ POLYGON_SIDES_LIMITS.max }}):
                         </label>
 
                         <input
@@ -239,8 +206,8 @@ const activeId = computed<ToolId>(() => {
                             ref="polygonInputRef"
                             v-model.number="polygonSides"
                             type="number"
-                            min="3"
-                            max="20"
+                            :min="POLYGON_SIDES_LIMITS.min"
+                            :max="POLYGON_SIDES_LIMITS.max"
                             step="1"
                             class="modalInput"
                             :class="{ invalid: polygonError }"

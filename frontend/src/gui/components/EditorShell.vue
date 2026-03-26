@@ -53,6 +53,14 @@ import VectorCanvas from '@/canvas/components/VectorCanvas.vue';
 import { useCanvasStore } from '@/stores/canvas';
 import { useToolsStore } from '@/stores/tools';
 import HotkeysHelp from './HotkeysHelp.vue';
+import { getDigitShortcutTool } from '@/config/tools';
+import {
+    FOCUS_MODE_SHORTCUT,
+    UNDO_SHORTCUT_CODE,
+    getCtrlCommandByCode,
+    getZoomCommandByCode,
+    type EditorMappedCtrlCommand,
+} from '@/config/hotkeys';
 
 const canvasStore = useCanvasStore();
 const toolsStore = useToolsStore();
@@ -70,104 +78,99 @@ function isEditableElement(target: EventTarget | null): boolean {
     );
 }
 
-function handleKeydown(e: KeyboardEvent) {
-    if (e.code === 'Space' && e.shiftKey) {
-        e.preventDefault();
-        isFocusMode.value = !isFocusMode.value;
-        return;
-    }
-
-    if (isEditableElement(e.target)) return;
-
-    const isCtrl = e.ctrlKey || e.metaKey;
-
-    if (!isCtrl) {
-        if (!isEditableElement(e.target)) {
-            switch (e.code) {
-                case 'Digit1':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('select');
-                    break;
-                case 'Digit2':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('line');
-                    break;
-                case 'Digit3':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('rect');
-                    break;
-                case 'Digit4':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('circle');
-                    break;
-                case 'Digit5':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('triangle');
-                    break;
-                case 'Digit6':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('polygon');
-                    break;
-                case 'Digit7':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('star');
-                    break;
-                case 'Digit8':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('hexagon');
-                    break;
-                case 'Digit9':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('arrow');
-                    break;
-                case 'Digit0':
-                    e.preventDefault();
-                    toolsStore.setActiveTool('eraser');
-                    break;
-            }
-        }
-
-        if (e.code === 'Equal' || e.code === 'NumpadAdd') {
-            e.preventDefault();
-            canvasStore.zoomIn();
-        } else if (e.code === 'Minus' || e.code === 'NumpadSubtract') {
-            e.preventDefault();
-            canvasStore.zoomOut();
-        }
-
-        return;
-    }
-
-    // Используем e.code, чтобы горячие клавиши были независимы от раскладки
-    if (e.code === 'KeyZ') {
-        e.preventDefault();
-        if (e.shiftKey) {
-            if (canvasStore.canRedo) canvasStore.redo();
-        } else {
-            if (canvasStore.canUndo) canvasStore.undo();
-        }
-    } else if (e.code === 'KeyY') {
-        e.preventDefault();
+const CTRL_COMMAND_HANDLERS: Readonly<
+    Record<EditorMappedCtrlCommand, () => void>
+> = {
+    redo: () => {
         if (canvasStore.canRedo) canvasStore.redo();
-    }
-
-    if (e.code === 'KeyD') {
-        e.preventDefault();
+    },
+    duplicate: () => {
         canvasStore.duplicateSelectedShape();
-        return;
-    }
-
-    if (e.code === 'KeyC') {
-        e.preventDefault();
+    },
+    copy: () => {
         canvasStore.copySelectedShape();
+    },
+    paste: () => {
+        canvasStore.pasteShape();
+    },
+};
+
+const ZOOM_COMMAND_HANDLERS: Readonly<Record<'in' | 'out', () => void>> = {
+    in: () => {
+        canvasStore.zoomIn();
+    },
+    out: () => {
+        canvasStore.zoomOut();
+    },
+};
+
+function handleFocusModeShortcut(event: KeyboardEvent): boolean {
+    if (
+        event.code !== FOCUS_MODE_SHORTCUT.code ||
+        event.shiftKey !== FOCUS_MODE_SHORTCUT.requiresShift
+    ) {
+        return false;
+    }
+
+    event.preventDefault();
+    isFocusMode.value = !isFocusMode.value;
+    return true;
+}
+
+function handleToolShortcut(event: KeyboardEvent): boolean {
+    const shortcutTool = getDigitShortcutTool(event.code);
+    if (!shortcutTool) return false;
+
+    event.preventDefault();
+    toolsStore.setActiveTool(shortcutTool);
+    return true;
+}
+
+function handleZoomShortcut(event: KeyboardEvent): boolean {
+    const zoomCommand = getZoomCommandByCode(event.code);
+    if (!zoomCommand) return false;
+
+    event.preventDefault();
+    ZOOM_COMMAND_HANDLERS[zoomCommand]();
+    return true;
+}
+
+function handleCtrlShortcut(event: KeyboardEvent): boolean {
+    // Используем e.code, чтобы горячие клавиши были независимы от раскладки
+    if (event.code === UNDO_SHORTCUT_CODE) {
+        event.preventDefault();
+
+        if (event.shiftKey) {
+            if (canvasStore.canRedo) canvasStore.redo();
+        } else if (canvasStore.canUndo) {
+            canvasStore.undo();
+        }
+
+        return true;
+    }
+
+    const ctrlCommand = getCtrlCommandByCode(event.code);
+    if (!ctrlCommand) return false;
+
+    event.preventDefault();
+    CTRL_COMMAND_HANDLERS[ctrlCommand]();
+    return true;
+}
+
+function handleKeydown(event: KeyboardEvent) {
+    if (handleFocusModeShortcut(event)) {
         return;
     }
 
-    if (e.code === 'KeyV') {
-        e.preventDefault();
-        canvasStore.pasteShape();
+    if (isEditableElement(event.target)) return;
+
+    if (!(event.ctrlKey || event.metaKey)) {
+        handleToolShortcut(event);
+        handleZoomShortcut(event);
         return;
     }
+
+    handleCtrlShortcut(event);
 }
 
 onMounted(() => {

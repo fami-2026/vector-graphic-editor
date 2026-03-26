@@ -1,20 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import {
+    type ToolType,
+    TOOLS_WITHOUT_CREATION_PARAMS,
+} from '@/config/tools';
 
-export type ToolType =
-    | 'select'
-    | 'hand'
-    | 'rect'
-    | 'circle'
-    | 'line'
-    | 'triangle'
-    | 'polygon'
-    | 'star'
-    | 'hexagon'
-    | 'parallelogram'
-    | 'arrow'
-    | 'eraser'
-    | 'pencil';
+export type { ToolType };
 
 type CreationParams = Record<string, unknown> | null;
 
@@ -40,13 +31,17 @@ export const useToolsStore = defineStore('tools', () => {
     function setActiveTool(tool: ToolType) {
         activeTool.value = tool;
 
-        if (tool === 'select' || tool === 'hand' || tool === 'eraser') {
-            creationParams.value = null;
+        if (TOOLS_WITHOUT_CREATION_PARAMS.has(tool)) {
+            clearCreationParams();
         }
     }
 
     function setCreationParams(params: CreationParams) {
         creationParams.value = params;
+    }
+
+    function clearCreationParams() {
+        creationParams.value = null;
     }
 
     function setPencilDefaults(updates: Partial<PencilDefaults>) {
@@ -61,6 +56,7 @@ export const useToolsStore = defineStore('tools', () => {
         setActiveTool,
         creationParams,
         setCreationParams,
+        clearCreationParams,
         pencilDefaults,
         setPencilDefaults,
     };

@@ -11,57 +11,26 @@ import {
     CanvasApiError,
     CanvasNotFoundError,
 } from '@/api/api';
-
-interface ShapeParams extends Record<string, unknown> {
-    sides?: number;
-    width?: number;
-    height?: number;
-    radius?: number;
-    fill?: string;
-    fillOpacity?: number;
-    stroke?: string;
-    strokeOpacity?: number;
-    strokeWidth?: number;
-    rotation?: number;
-}
-
-type SerializedShapeBase = {
-    type: string;
-    id: string;
-    position: { x: number; y: number };
-    rotation: number;
-    scaleX: number;
-    scaleY: number;
-    skewX: number;
-    skewY: number;
-};
-
-type SerializedShape = SerializedShapeBase & Record<string, unknown>;
-
-type SceneSnapshot = {
-    shapes: SerializedShape[];
-    selectedId: string | null;
-};
-
-type CanvasStorageData = {
-    documentId: string;
-    isOfflineMode: boolean;
-    shapes: SerializedShape[];
-    selectedId: string | null;
-    selectedIds?: string[];
-    selectionRect?: { start: Point; end: Point } | null;
-    zoom: number;
-    pan: { x: number; y: number };
-    backgroundColor?: string;
-};
-
-type VectorEditorExport = {
-    format: 'vector-editor';
-    version: 1;
-    exportedAt: string;
-    backgroundColor: string;
-    scene: SceneSnapshot;
-};
+import { getShapeLabel } from '@/config/shapeLabels';
+import type {
+    CanvasStorageData,
+    SceneSnapshot,
+    SerializedShape,
+    ShapeParams,
+    VectorEditorExport,
+} from '@/stores/canvas/types';
+import {
+    CANVAS_DEFAULTS,
+    CANVAS_STORAGE_KEYS,
+    CANVAS_VIEWPORT_LIMITS,
+    CONTINUOUS_CHANGE_TIMEOUT_MS as CONTINUOUS_CHANGE_TIMEOUT_MS_VALUE,
+    HISTORY_LIMIT as HISTORY_LIMIT_VALUE,
+    SHAPE_CLONE_OFFSET,
+    SHAPE_COPY_SUFFIX,
+    SYNC_DOCUMENT_DEBOUNCE_MS as SYNC_DOCUMENT_DEBOUNCE_MS_VALUE,
+} from '@/stores/canvas/constants';
+import { createOffsetShapeClone } from '@/stores/canvas/clone';
+import { deserializeShapes, serializeShape } from '@/stores/canvas/scene';
 
 export const useCanvasStore = defineStore('canvas', () => {
     const shapes = ref<Shape[]>([]);
@@ -78,23 +47,28 @@ export const useCanvasStore = defineStore('canvas', () => {
     const undoStack = ref<SceneSnapshot[]>([]);
     const redoStack = ref<SceneSnapshot[]>([]);
     const isInteractionActive = ref(false);
-    const HISTORY_LIMIT = 50;
-    const MIN_ZOOM = 10;
-    const MAX_ZOOM = 500;
-    const ZOOM_STEP = 10;
-    const zoom = ref(100);
-    const pan = ref({ x: 0, y: 0 });
-    const documentId = ref<string>('0');
+    const HISTORY_LIMIT = HISTORY_LIMIT_VALUE;
+    const MIN_ZOOM = CANVAS_VIEWPORT_LIMITS.minZoom;
+    const MAX_ZOOM = CANVAS_VIEWPORT_LIMITS.maxZoom;
+    const ZOOM_STEP = CANVAS_VIEWPORT_LIMITS.zoomStep;
+    const DEFAULT_DOCUMENT_ID = CANVAS_DEFAULTS.documentId;
+    const DEFAULT_ZOOM = CANVAS_DEFAULTS.zoom;
+    const DEFAULT_PAN = CANVAS_DEFAULTS.pan;
+    const CANVAS_STORAGE_KEY = CANVAS_STORAGE_KEYS.scene;
+    const CANVAS_BG_COLOR_STORAGE_KEY = CANVAS_STORAGE_KEYS.backgroundColor;
+    const zoom = ref(DEFAULT_ZOOM);
+    const pan = ref({ ...DEFAULT_PAN });
+    const documentId = ref<string>(DEFAULT_DOCUMENT_ID);
     const isOfflineMode = ref(false);
     const serverError = ref<string | null>(null);
-    const backgroundColor = ref<string>('#ffffff');
+    const backgroundColor = ref<string>(CANVAS_DEFAULTS.backgroundColor);
     const clipboardShape = ref<SerializedShape | null>(null);
 
     let isContinuousChangeActive = false;
     let continuousChangeTimer: number | null = null;
     let syncDocumentTimer: number | null = null;
-    const CONTINUOUS_CHANGE_TIMEOUT = 700;
-    const SYNC_DOCUMENT_DEBOUNCE_MS = 400;
+    const CONTINUOUS_CHANGE_TIMEOUT = CONTINUOUS_CHANGE_TIMEOUT_MS_VALUE;
+    const SYNC_DOCUMENT_DEBOUNCE_MS = SYNC_DOCUMENT_DEBOUNCE_MS_VALUE;
     const selectedShapes = computed(() =>
         shapes.value.filter((s) => selectedIds.value.includes(s.id))
     );
@@ -106,109 +80,178 @@ export const useCanvasStore = defineStore('canvas', () => {
         () => shapes.value.find((s) => s.id === selectedId.value) ?? null
     );
 
+    const createShape = (type: string, id: string, position: Point): Shape =>
+        shapeRegistry.create(type, id, position);
+
+    function getPrimarySelectionId(ids: string[]): string | null {
+        return ids[0] ?? null;
+    }
+
+    function syncPrimarySelectionFromIds() {
+        selectedId.value = getPrimarySelectionId(selectedIds.value);
+    }
+
+    function setSelectedIds(nextIds: string[]) {
+        selectedIds.value = nextIds;
+        syncPrimarySelectionFromIds();
+    }
+
+    function clearSelectionState() {
+        applySelection([], { clearRect: true, sync: false });
+    }
+
+    function setSelectionRectFromBounds(
+        bounds:
+            | {
+                  minX: number;
+                  minY: number;
+                  maxX: number;
+                  maxY: number;
+              }
+            | null
+    ) {
+        if (!bounds) {
+            selectionRect.value = null;
+            return;
+        }
+
+        selectionRect.value = {
+            start: { x: bounds.minX, y: bounds.minY },
+            end: { x: bounds.maxX, y: bounds.maxY },
+        };
+    }
+
+    function clearSelectionRect() {
+        setSelectionRectFromBounds(null);
+    }
+
+    /**
+     * Единая точка изменения выделения.
+     * Гарантирует синхронизацию `selectedIds`/`selectedId`, опциональную очистку рамки
+     * и запуск синка документа при необходимости.
+     */
+    function applySelection(
+        nextIds: string[],
+        options: { clearRect?: boolean; sync?: boolean } = {}
+    ) {
+        setSelectedIds(nextIds);
+
+        if (options.clearRect) {
+            clearSelectionRect();
+        }
+
+        if (options.sync) {
+            scheduleDocumentSync();
+        }
+    }
+
+    function clampZoom(value: number, shouldRound = false): number {
+        const normalized = shouldRound ? Math.round(value) : value;
+        return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, normalized));
+    }
+
+    function toUniqueStringArray(values: unknown[]): string[] {
+        const uniqueValues: string[] = [];
+        const seen = new Set<string>();
+
+        values.forEach((value) => {
+            if (typeof value !== 'string' || seen.has(value)) {
+                return;
+            }
+            seen.add(value);
+            uniqueValues.push(value);
+        });
+
+        return uniqueValues;
+    }
+
+    function normalizePersistedSelection(data: Partial<CanvasStorageData>): string[] {
+        const candidateIds = Array.isArray(data.selectedIds)
+            ? toUniqueStringArray(data.selectedIds)
+            : [];
+
+        if (candidateIds.length > 0) {
+            return candidateIds;
+        }
+
+        return typeof data.selectedId === 'string' ? [data.selectedId] : [];
+    }
+
+    function applySelectionFromPersistedData(data: Partial<CanvasStorageData>) {
+        const persistedIds = normalizePersistedSelection(data);
+        const existingIds = new Set(shapes.value.map((shape) => shape.id));
+        const validIds = persistedIds.filter((id) => existingIds.has(id));
+        applySelection(validIds, { sync: false });
+    }
+
+    function buildDefaultShapeName(type: string): string {
+        const existingShapesOfType = shapes.value.filter((shape) => shape.type === type);
+        const typeName = getShapeLabel(type);
+        const number = existingShapesOfType.length + 1;
+        return `${typeName} ${number}`;
+    }
+
+    function appendShape(shape: Shape, name: string): Shape {
+        (shape as Shape).name = name;
+        shapes.value.push(shape);
+        scheduleDocumentSync();
+        return shape;
+    }
+
     function copySelectedShape() {
         if (!selectedShape.value) return;
         clipboardShape.value = serializeShape(selectedShape.value);
+    }
+
+    function appendClonedShape(
+        plain: SerializedShape,
+        options: { updateClipboard: boolean }
+    ) {
+        const clonedShape = createOffsetShapeClone(plain, {
+            offset: SHAPE_CLONE_OFFSET,
+            nameSuffix: SHAPE_COPY_SUFFIX,
+            createShape,
+            generateId,
+        });
+        shapes.value.push(clonedShape);
+        applySelection([clonedShape.id], { clearRect: true, sync: false });
+
+        if (options.updateClipboard) {
+            clipboardShape.value = serializeShape(clonedShape);
+        }
+
+        scheduleDocumentSync();
     }
 
     function pasteShape() {
         if (!clipboardShape.value) return;
 
         pushHistory();
-
-        const plain = clipboardShape.value;
-        const { type, id: _oldId, position, ...rest } = plain;
-
-        const newId = generateId();
-        const newPosition = {
-            x: position.x + 20,
-            y: position.y + 20,
-        };
-
-        const newShape = shapeRegistry.create(type, newId, newPosition);
-        Object.assign(newShape, rest);
-
-        newShape.id = newId;
-        newShape.position = newPosition;
-
-        if ('name' in newShape) {
-            const sourceName =
-                typeof (plain as Record<string, unknown>).name === 'string'
-                    ? String((plain as Record<string, unknown>).name)
-                    : type;
-
-            (newShape as Shape).name = `${sourceName} копия`;
-        }
-
-        shapes.value.push(newShape as Shape);
-        selectedId.value = newId;
-
-        clipboardShape.value = serializeShape(newShape as Shape);
+        appendClonedShape(clipboardShape.value, { updateClipboard: true });
     }
+
     function duplicateSelectedShape() {
         if (!selectedShape.value) return;
 
         pushHistory();
-
-        const plain = serializeShape(selectedShape.value);
-        const { type, id: _oldId, position, ...rest } = plain;
-
-        const newId = generateId();
-        const newPosition = {
-            x: position.x + 20,
-            y: position.y + 20,
-        };
-
-        const newShape = shapeRegistry.create(type, newId, newPosition);
-        Object.assign(newShape, rest);
-
-        newShape.id = newId;
-        newShape.position = newPosition;
-
-        if ('name' in newShape) {
-            const baseName =
-                typeof (plain as Record<string, unknown>).name === 'string'
-                    ? String((plain as Record<string, unknown>).name)
-                    : type;
-
-            (newShape as Shape).name = `${baseName} копия`;
-        }
-
-        shapes.value.push(newShape as Shape);
-        selectedId.value = newId;
-    }
-    function serializeShape(shape: Shape): SerializedShape {
-        const plain = JSON.parse(JSON.stringify(shape)) as SerializedShape;
-        plain.type = (shape as unknown as { type: string }).type;
-        plain.id = shape.id;
-        plain.position = { x: shape.position.x, y: shape.position.y };
-        plain.rotation = shape.rotation;
-        plain.scaleX = shape.scaleX;
-        plain.scaleY = shape.scaleY;
-        plain.skewX = shape.skewX;
-        plain.skewY = shape.skewY;
-        return plain;
+        appendClonedShape(serializeShape(selectedShape.value), {
+            updateClipboard: false,
+        });
     }
 
     function createSnapshot(): SceneSnapshot {
         return {
             shapes: shapes.value.map((s) => serializeShape(s)),
-            selectedId: selectedId.value,
+            selectedId: getPrimarySelectionId(selectedIds.value),
         };
     }
 
     function restoreSnapshot(snapshot: SceneSnapshot) {
-        const restored: Shape[] = snapshot.shapes.map((plain) => {
-            const { type, id, position, ...rest } = plain;
-            const shape = shapeRegistry.create(type, id, position);
-            Object.assign(shape, rest);
-            return shape as Shape;
+        shapes.value = deserializeShapes(snapshot.shapes, createShape);
+        applySelection(snapshot.selectedId ? [snapshot.selectedId] : [], {
+            clearRect: true,
+            sync: false,
         });
-
-        shapes.value = restored;
-        selectedId.value = snapshot.selectedId;
-        selectedIds.value = snapshot.selectedId ? [snapshot.selectedId] : [];
-        selectionRect.value = null;
     }
 
     function snapshotToServerContent(
@@ -220,6 +263,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         };
     }
 
+    /**
+     * Сохраняет текущий снимок сцены в undo-стек и очищает redo-стек.
+     */
     function pushHistory() {
         const snapshot = createSnapshot();
         undoStack.value.push(snapshot);
@@ -241,6 +287,10 @@ export const useCanvasStore = defineStore('canvas', () => {
         scheduleDocumentSync();
     }
 
+    /**
+     * Для непрерывных правок (например, drag) добавляет историю один раз
+     * и переиспользует ее в течение тайм-окна, чтобы не засорять undo-стек.
+     */
     function ensureHistoryForContinuousChange() {
         if (isInteractionActive.value) return;
 
@@ -283,9 +333,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const canRedo = computed(() => redoStack.value.length > 0);
 
     function selectShape(id: string | null) {
-        selectedId.value = id;
-        selectedIds.value = id ? [id] : [];
-        selectionRect.value = null;
+        applySelection(id ? [id] : [], { clearRect: true, sync: true });
     }
 
     function selectShapeWithAdd(
@@ -294,24 +342,21 @@ export const useCanvasStore = defineStore('canvas', () => {
     ) {
         if (!id) {
             if (!addToSelection) {
-                selectedIds.value = [];
-                selectedId.value = null;
-                selectionRect.value = null;
+                clearSelectionState();
             }
             return;
         }
 
         if (addToSelection) {
             if (selectedIds.value.includes(id)) {
-                selectedIds.value = selectedIds.value.filter((i) => i !== id);
+                applySelection(selectedIds.value.filter((i) => i !== id), {
+                    sync: true,
+                });
             } else {
-                selectedIds.value = [...selectedIds.value, id];
+                applySelection([...selectedIds.value, id], { sync: true });
             }
-            selectedId.value = selectedIds.value[0] || null;
         } else {
-            selectedIds.value = [id];
-            selectedId.value = id;
-            selectionRect.value = null;
+            applySelection([id], { clearRect: true, sync: true });
         }
     }
 
@@ -321,7 +366,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         maxX: number;
         maxY: number;
     }) {
-        selectedIds.value = shapes.value
+        const nextSelectedIds = shapes.value
             .filter((shape) => {
                 const box = shape.getBoundingBox();
                 return !(
@@ -332,21 +377,15 @@ export const useCanvasStore = defineStore('canvas', () => {
                 );
             })
             .map((s) => s.id);
-        selectedId.value = selectedIds.value[0] || null;
+        applySelection(nextSelectedIds, { sync: false });
+        setSelectionRectFromBounds(selectedIds.value.length > 0 ? rect : null);
 
-        if (selectedIds.value.length > 0) {
-            selectionRect.value = {
-                start: { x: rect.minX, y: rect.minY },
-                end: { x: rect.maxX, y: rect.maxY },
-            };
-        } else {
-            selectionRect.value = null;
-        }
+        scheduleDocumentSync();
     }
 
     function startSelection(startPoint: Point) {
         selectionBox.value = { start: startPoint, end: startPoint };
-        selectionRect.value = null;
+        clearSelectionRect();
         isSelecting.value = true;
     }
 
@@ -412,17 +451,17 @@ export const useCanvasStore = defineStore('canvas', () => {
         shapes.value = shapes.value.filter(
             (s) => !selectedIds.value.includes(s.id)
         );
-        selectedIds.value = [];
-        selectedId.value = null;
-        selectionRect.value = null;
+        clearSelectionState();
         scheduleDocumentSync();
     }
 
     function selectAll() {
         if (shapes.value.length === 0) return;
 
-        selectedIds.value = shapes.value.map((s) => s.id);
-        selectedId.value = selectedIds.value[0] || null;
+        applySelection(
+            shapes.value.map((s) => s.id),
+            { sync: false }
+        );
 
         if (selectedIds.value.length > 0) {
             const allPoints = shapes.value.flatMap((s) => {
@@ -438,17 +477,14 @@ export const useCanvasStore = defineStore('canvas', () => {
             const maxX = Math.max(...allPoints.map((p) => p.x));
             const maxY = Math.max(...allPoints.map((p) => p.y));
 
-            selectionRect.value = {
-                start: { x: minX, y: minY },
-                end: { x: maxX, y: maxY },
-            };
+            setSelectionRectFromBounds({ minX, minY, maxX, maxY });
         }
+
+        scheduleDocumentSync();
     }
 
     function clearSelection() {
-        selectedIds.value = [];
-        selectedId.value = null;
-        selectionRect.value = null;
+        applySelection([], { clearRect: true, sync: true });
     }
 
     function addShape(
@@ -461,62 +497,17 @@ export const useCanvasStore = defineStore('canvas', () => {
             pushHistory();
         }
 
-        const existingShapesOfType = shapes.value.filter(
-            (s) => s.type === type
-        );
-        const typeName =
-            type === 'rect'
-                ? 'Прямоугольник'
-                : type === 'circle'
-                  ? 'Круг'
-                  : type === 'line'
-                    ? 'Линия'
-                    : type === 'polygon'
-                      ? 'Многоугольник'
-                      : type === 'star'
-                        ? 'Звезда'
-                        : type === 'triangle'
-                          ? 'Треугольник'
-                          : type === 'arrow'
-                            ? 'Стрелка'
-                            : type === 'hexagon'
-                              ? 'Шестиугольник'
-                              : type === 'parallelogram'
-                                ? 'Параллелограмм'
-                                : type === 'pencil'
-                                  ? 'Карандаш'
-                                  : type;
-
-        const number = existingShapesOfType.length + 1;
-        const defaultName = `${typeName} ${number}`;
+        const defaultName = buildDefaultShapeName(type);
 
         let shape: Shape;
 
         if (type === 'polygon' && params?.sides) {
-            shape = new PolygonShape(
-                generateId(),
-                pos,
-                params.sides,
-                100,
-                100,
-                0,
-                '#3498db',
-                0,
-                '#2c3e50',
-                1,
-                2
-            );
-            (shape as Shape).name = defaultName;
-            shapes.value.push(shape);
-            scheduleDocumentSync();
-            return shape;
+            shape = new PolygonShape(generateId(), pos, params.sides);
+            return appendShape(shape, defaultName);
         }
 
         shape = shapeRegistry.create(type, generateId(), pos);
-        (shape as Shape).name = defaultName;
-        shapes.value.push(shape);
-        scheduleDocumentSync();
-        return shape;
+        return appendShape(shape, defaultName);
     }
 
     function updateShape(id: string, updates: Partial<Shape>) {
@@ -541,12 +532,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     function deleteShape(id: string) {
         pushHistory();
         shapes.value = shapes.value.filter((s) => s.id !== id);
-        if (selectedId.value === id) selectedId.value = null;
-        selectedIds.value = selectedIds.value.filter((i) => i !== id);
-        if (selectedIds.value.length === 0) {
-            selectionRect.value = null;
-        }
-        scheduleDocumentSync();
+        const filteredSelectedIds = selectedIds.value.filter((i) => i !== id);
+        applySelection(filteredSelectedIds, {
+            clearRect: filteredSelectedIds.length === 0,
+            sync: true,
+        });
     }
 
     function moveShape(fromIndex: number, toIndex: number) {
@@ -571,10 +561,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     function setZoom(value: number) {
-        const newZoom = Math.max(
-            MIN_ZOOM,
-            Math.min(MAX_ZOOM, Math.round(value))
-        );
+        const newZoom = clampZoom(value, true);
         if (newZoom === zoom.value) return;
 
         const worldCenterX = -pan.value.x / (zoom.value / 100);
@@ -603,10 +590,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const rect = canvasEl?.getBoundingClientRect();
 
         if (!rect) {
-            zoom.value = Math.max(
-                MIN_ZOOM,
-                Math.min(MAX_ZOOM, zoom.value + delta)
-            );
+            zoom.value = clampZoom(zoom.value + delta);
             return;
         }
 
@@ -614,10 +598,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const worldCenterX = -pan.value.x / zoomFactor;
         const worldCenterY = -pan.value.y / zoomFactor;
 
-        const newZoom = Math.max(
-            MIN_ZOOM,
-            Math.min(MAX_ZOOM, zoom.value + delta)
-        );
+        const newZoom = clampZoom(zoom.value + delta);
         const newZoomFactor = newZoom / 100;
 
         const newPanX = -worldCenterX * newZoomFactor;
@@ -639,10 +620,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function setBackgroundColor(color: string) {
         backgroundColor.value = color;
-        localStorage.setItem('canvas-bg-color', color);
+        localStorage.setItem(CANVAS_BG_COLOR_STORAGE_KEY, color);
     }
-
-    const STORAGE_KEY = 'vector-editor-canvas';
 
     function saveToLocalStorage() {
         try {
@@ -650,7 +629,7 @@ export const useCanvasStore = defineStore('canvas', () => {
                 documentId: documentId.value,
                 isOfflineMode: isOfflineMode.value,
                 shapes: shapes.value.map(serializeShape),
-                selectedId: selectedId.value,
+                selectedId: getPrimarySelectionId(selectedIds.value),
                 selectedIds: selectedIds.value,
                 selectionRect: selectionRect.value
                     ? { ...selectionRect.value }
@@ -659,7 +638,7 @@ export const useCanvasStore = defineStore('canvas', () => {
                 pan: { ...pan.value },
                 backgroundColor: backgroundColor.value,
             };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            localStorage.setItem(CANVAS_STORAGE_KEY, JSON.stringify(data));
         } catch (e) {
             console.error('Ошибка сохранения:', e);
         }
@@ -667,51 +646,34 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function loadFromLocalStorage() {
         try {
-            const saved = localStorage.getItem(STORAGE_KEY);
+            const saved = localStorage.getItem(CANVAS_STORAGE_KEY);
             if (!saved) return;
 
             const data = JSON.parse(saved) as Partial<CanvasStorageData>;
-            documentId.value = String(data.documentId ?? '0');
+            documentId.value = String(data.documentId ?? DEFAULT_DOCUMENT_ID);
             isOfflineMode.value = Boolean(data.isOfflineMode ?? false);
-            zoom.value = Math.max(
-                MIN_ZOOM,
-                Math.min(MAX_ZOOM, Number(data.zoom ?? 100))
-            );
+            zoom.value = clampZoom(Number(data.zoom ?? DEFAULT_ZOOM));
 
             const savedPan = data.pan;
             pan.value = {
-                x: Number(savedPan?.x ?? 0),
-                y: Number(savedPan?.y ?? 0),
+                x: Number(savedPan?.x ?? DEFAULT_PAN.x),
+                y: Number(savedPan?.y ?? DEFAULT_PAN.y),
             };
 
             if (data.backgroundColor) {
                 backgroundColor.value = data.backgroundColor;
             } else {
-                const savedBgColor = localStorage.getItem('canvas-bg-color');
+                const savedBgColor = localStorage.getItem(
+                    CANVAS_BG_COLOR_STORAGE_KEY
+                );
                 if (savedBgColor) {
                     backgroundColor.value = savedBgColor;
                 }
             }
 
-            const restored: Shape[] = (data.shapes ?? []).map(
-                (plain: SerializedShape) => {
-                    const { type, id, position, ...rest } = plain;
-                    const shape = shapeRegistry.create(type, id, position);
-                    Object.assign(shape, rest);
-                    return shape as Shape;
-                }
-            );
+            shapes.value = deserializeShapes(data.shapes ?? [], createShape);
+            applySelectionFromPersistedData(data);
 
-            shapes.value = restored;
-            if (data.selectedIds && data.selectedIds.length > 0) {
-                selectedIds.value = data.selectedIds;
-                documentId.value = data.documentId
-                    ? String(data.documentId)
-                    : '0';
-            } else {
-                selectedId.value = data.selectedId ?? null;
-                selectedIds.value = selectedId.value ? [selectedId.value] : [];
-            }
             if (data.selectionRect) {
                 selectionRect.value = { ...data.selectionRect };
             }
@@ -724,7 +686,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const localScene = createSnapshot();
 
         try {
-            if (documentId.value !== '0') {
+            if (documentId.value !== DEFAULT_DOCUMENT_ID) {
                 const remote = await getCanvasById(documentId.value);
                 if (localScene.shapes.length === 0) {
                     restoreSnapshot({
@@ -760,7 +722,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             serverError.value = null;
         } catch (error) {
             isOfflineMode.value = true;
-            documentId.value = '0';
+            documentId.value = DEFAULT_DOCUMENT_ID;
             serverError.value =
                 error instanceof Error ? error.message : 'Сервер недоступен';
         }
@@ -801,7 +763,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
             if (error instanceof CanvasApiError) {
                 isOfflineMode.value = true;
-                documentId.value = '0';
+                documentId.value = DEFAULT_DOCUMENT_ID;
                 serverError.value = error.message;
                 return {
                     success: false,
@@ -815,7 +777,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     async function syncDocument() {
-        if (isOfflineMode.value || documentId.value === '0') {
+        if (isOfflineMode.value || documentId.value === DEFAULT_DOCUMENT_ID) {
             return;
         }
 
@@ -827,12 +789,16 @@ export const useCanvasStore = defineStore('canvas', () => {
             serverError.value = null;
         } catch (error) {
             isOfflineMode.value = true;
-            documentId.value = '0';
+            documentId.value = DEFAULT_DOCUMENT_ID;
             serverError.value =
                 error instanceof Error ? error.message : 'Сервер недоступен';
         }
     }
 
+    /**
+     * Дебаунсит синхронизацию документа с сервером.
+     * Все частые локальные изменения складываются в один сетевой вызов.
+     */
     function scheduleDocumentSync() {
         if (syncDocumentTimer !== null) {
             window.clearTimeout(syncDocumentTimer);
@@ -918,7 +884,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         ],
         () => {
             saveToLocalStorage();
-            scheduleDocumentSync();
         },
         { deep: true }
     );
@@ -980,3 +945,4 @@ export const useCanvasStore = defineStore('canvas', () => {
         importFromJson,
     };
 });
+
