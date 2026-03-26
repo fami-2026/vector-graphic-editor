@@ -335,7 +335,6 @@
                                     stroke-width="2"
                                     stroke-linecap="round"
                                 />
-                                
                                 <polyline
                                     v-else-if="shape.type === 'pencil'"
                                     points="2,13 6,9 9,12 13,6 18,10"
