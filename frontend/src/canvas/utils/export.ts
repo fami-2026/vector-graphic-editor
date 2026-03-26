@@ -292,7 +292,7 @@ function shapeToSvgElement(shape: Shape): string | null {
         }
         case 'pencil': {
             const points = s.points;
-            if (!points || points.length ===0) return null;
+            if (!points || points.length === 0) return null;
             const pointsStr = points
                 .map((p: Point) => `${p.x},${p.y}`)
                 .join(' ');
