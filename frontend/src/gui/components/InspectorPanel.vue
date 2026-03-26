@@ -1031,8 +1031,8 @@ function getThumbPoints(shape: Shape): string {
         }
         case 'hexagon':
             return generatePolygonPoints(6, 10, 10, 8);
-        case 'arrow':
-            return '1,8 12,8 12,3 19,10 12,17 12,12 1,12';
+        //case 'arrow':
+        //  return '1,8 12,8 12,3 19,10 12,17 12,12 1,12';
         default:
             return generatePolygonPoints(5, 10, 10, 8);
     }

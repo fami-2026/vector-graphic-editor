@@ -101,6 +101,7 @@ export class ArrowShape extends BaseShape {
         this.stroke = stroke;
         this.strokeOpacity = strokeOpacity;
         this.strokeWidth = strokeWidth;
+        this.strokeWidth = Math.min(10, Math.max(0.5, strokeWidth));
     }
 
     setSize(width: number, height: number): void {
@@ -109,18 +110,61 @@ export class ArrowShape extends BaseShape {
         this.headSize = Math.min(this.headSize, this.length);
     }
 
+    private _strokeWidth: number = 2;
+
+    private getLocalLinePoints(): { start: Point; end: Point } {
+        const headBase = this.length - this.headSize;
+        const centerX = this.length / 2; // Центр по X
+        return {
+            start: { x: -centerX, y: 0 },
+            end: { x: headBase - centerX, y: 0 },
+        };
+    }
+
+    private getLocalHeadLines(): {
+        left: { start: Point; end: Point };
+        right: { start: Point; end: Point };
+    } {
+        const headBase = this.length - this.headSize;
+        const centerX = this.length / 2;
+        const angle = Math.PI / 4;
+        const headLength = this.headSize;
+
+        const leftEnd = {
+            x: headBase - headLength * Math.cos(angle) - centerX,
+            y: -headLength * Math.sin(angle),
+        };
+
+        const rightEnd = {
+            x: headBase - headLength * Math.cos(angle) - centerX,
+            y: headLength * Math.sin(angle),
+        };
+
+        return {
+            left: {
+                start: { x: headBase - centerX, y: this.strokeWidth * 0.28 },
+                end: leftEnd,
+            },
+            right: {
+                start: { x: headBase - centerX, y: this.strokeWidth * -0.28 },
+                end: rightEnd,
+            },
+        };
+    }
+
     private getLocalArrowPoints(): Point[] {
         const halfThick = this.thickness / 2;
         const headBase = this.length - this.headSize;
+        const centerX = this.length / 2;
 
         return [
-            { x: 0, y: -halfThick },
-            { x: headBase, y: -halfThick },
-            { x: headBase, y: -this.headSize },
-            { x: this.length, y: 0 },
-            { x: headBase, y: this.headSize },
-            { x: headBase, y: halfThick },
-            { x: 0, y: halfThick },
+            { x: -centerX, y: -halfThick },
+            { x: headBase - centerX, y: -halfThick },
+            { x: headBase - centerX, y: -this.headSize },
+            { x: this.length - centerX, y: 0 },
+            { x: headBase - centerX, y: this.headSize },
+            { x: headBase - centerX, y: halfThick },
+            { x: -centerX, y: halfThick },
         ];
     }
 
@@ -130,6 +174,43 @@ export class ArrowShape extends BaseShape {
             x: p.x * this.scaleX,
             y: p.y * this.scaleY,
         }));
+    }
+
+    private getScaledLocalLinePoints(): { start: Point; end: Point } {
+        const { start, end } = this.getLocalLinePoints();
+        return {
+            start: { x: start.x * this.scaleX, y: start.y * this.scaleY },
+            end: { x: end.x * this.scaleX, y: end.y * this.scaleY },
+        };
+    }
+
+    private getScaledLocalHeadLines(): {
+        left: { start: Point; end: Point };
+        right: { start: Point; end: Point };
+    } {
+        const { left, right } = this.getLocalHeadLines();
+        return {
+            left: {
+                start: {
+                    x: left.start.x * this.scaleX,
+                    y: left.start.y * this.scaleY,
+                },
+                end: {
+                    x: left.end.x * this.scaleX,
+                    y: left.end.y * this.scaleY,
+                },
+            },
+            right: {
+                start: {
+                    x: right.start.x * this.scaleX,
+                    y: right.start.y * this.scaleY,
+                },
+                end: {
+                    x: right.end.x * this.scaleX,
+                    y: right.end.y * this.scaleY,
+                },
+            },
+        };
     }
 
     hitTest(globalPoint: Point): boolean {
@@ -210,47 +291,40 @@ export class ArrowShape extends BaseShape {
     getLocalBox(): BoundingBox {
         const halfThick = this.thickness / 2;
         const halfHead = this.headSize;
+        const centerX = this.length / 2;
         return {
-            minX: 0,
+            minX: -centerX,
             minY: -Math.max(halfThick, halfHead),
-            maxX: this.length,
+            maxX: this.length - centerX,
             maxY: Math.max(halfThick, halfHead),
         };
     }
 
     render(ctx: CanvasRenderingContext2D): void {
-        const points = this.getScaledLocalArrowPoints();
-
-        if (points.length < 3) return;
+        const linePoints = this.getScaledLocalLinePoints();
+        const headLines = this.getScaledLocalHeadLines();
 
         ctx.save();
         const m = this.getVMatrix();
         ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
 
         ctx.beginPath();
-        const firstPoint = points[0];
-        if (!firstPoint) {
-            ctx.restore();
-            return;
-        }
-        ctx.moveTo(firstPoint.x, firstPoint.y);
-
-        for (let i = 1; i < points.length; i++) {
-            const point = points[i];
-            if (point) {
-                ctx.lineTo(point.x, point.y);
-            }
-        }
-
-        ctx.closePath();
-
-        ctx.globalAlpha = this.fillOpacity;
-        ctx.fillStyle = this.fill;
-        ctx.fill();
+        ctx.moveTo(linePoints.start.x, linePoints.start.y);
+        ctx.lineTo(linePoints.end.x, linePoints.end.y);
 
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(headLines.left.start.x, headLines.left.start.y);
+        ctx.lineTo(headLines.left.end.x, headLines.left.end.y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(headLines.right.start.x, headLines.right.start.y);
+        ctx.lineTo(headLines.right.end.x, headLines.right.end.y);
         ctx.stroke();
 
         ctx.globalAlpha = 1;
