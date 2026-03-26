@@ -8,7 +8,6 @@ import {
     Square,
     Circle,
     Eraser,
-    Type,
     Triangle,
     Star,
     Hexagon,
@@ -35,8 +34,7 @@ type ToolId =
     | 'parallelogram'
     | 'arrow'
     | 'eraser'
-    | 'pencil'
-    | 'text';
+    | 'pencil';
 
 type Tool = {
     id: ToolId;
@@ -58,7 +56,6 @@ const tools: Tool[] = [
     { id: 'arrow', title: 'Стрелка', icon: ArrowUp },
     { id: 'eraser', title: 'Ластик', icon: Eraser },
     { id: 'pencil', title: 'Карандаш', icon: Pencil },
-    { id: 'text', title: 'Текст', icon: Type },
 ];
 
 const toolsStore = useToolsStore();
