@@ -177,95 +177,122 @@ export function useInteractions(
     }
 
     function hitTest(point: Point): Shape | null {
-        const zoomCoef = 1 / zoom.value * 100;
+        const zoomCoef = (1 / zoom.value) * 100;
         for (let i = shapes.value.length - 1; i >= 0; i--) {
             const shape = shapes.value[i];
-            if (shape?.hitTest(point, zoomCoef)) return shape; 
+            if (shape?.hitTest(point, zoomCoef)) return shape;
         }
         return null;
     }
 
-function detectResizeHandle(
-    shape: Shape,
-    globalPoint: Point
-): ResizeHandle | null {
-    const zoomCoef = 100 / zoom.value; 
-    const cornerRadius = 8 * zoomCoef;
-    const edgeRadius = 4 * zoomCoef;
+    function detectResizeHandle(
+        shape: Shape,
+        globalPoint: Point
+    ): ResizeHandle | null {
+        const zoomCoef = 100 / zoom.value;
+        const cornerRadius = 8 * zoomCoef;
+        const edgeRadius = 4 * zoomCoef;
 
-    if (shape.type === 'line') {
-        const line = shape as LineShape;
-        if (!line.localEndPoint) return null;
+        if (shape.type === 'line') {
+            const line = shape as LineShape;
+            if (!line.localEndPoint) return null;
 
-        const vPt = line.toVLocalPoint(globalPoint);
-        
-        const ex = line.localEndPoint.x * line.scaleX;
-        const ey = line.localEndPoint.y * line.scaleY;
+            const vPt = line.toVLocalPoint(globalPoint);
 
-        const distS = Math.hypot(vPt.x, vPt.y);
-        const distE = Math.hypot(vPt.x - ex, vPt.y - ey);
+            const ex = line.localEndPoint.x * line.scaleX;
+            const ey = line.localEndPoint.y * line.scaleY;
 
-        if (distS <= cornerRadius && distS <= distE) return 's';
-        if (distE <= cornerRadius) return 'e';
-        
-        return null;
+            const distS = Math.hypot(vPt.x, vPt.y);
+            const distE = Math.hypot(vPt.x - ex, vPt.y - ey);
+
+            if (distS <= cornerRadius && distS <= distE) return 's';
+            if (distE <= cornerRadius) return 'e';
+
+            return null;
+        }
+
+        const box = shape.getLocalBox();
+        const pad = SELECTION_PADDING * zoomCoef;
+
+        const minX = box.minX - pad;
+        const maxX = box.maxX + pad;
+        const minY = box.minY - pad;
+        const maxY = box.maxY + pad;
+
+        const vLocalPoint = shape.toVLocalPoint(globalPoint);
+        const rawY = Math.min(box.minY * shape.scaleY, box.maxY * shape.scaleY);
+        const visualRotY = rawY - pad - 20 * zoomCoef;
+
+        if (
+            Math.hypot(vLocalPoint.x, vLocalPoint.y - visualRotY) <=
+            cornerRadius
+        ) {
+            return 'rot';
+        }
+
+        const localPoint = shape.toLocalPoint(globalPoint);
+
+        const dxMin = Math.abs(localPoint.x - minX);
+        const dxMax = Math.abs(localPoint.x - maxX);
+        const dyMin = Math.abs(localPoint.y - minY);
+        const dyMax = Math.abs(localPoint.y - maxY);
+
+        const dLT = Math.hypot(dxMin, dyMin);
+        const dRT = Math.hypot(dxMax, dyMin);
+        const dLB = Math.hypot(dxMin, dyMax);
+        const dRB = Math.hypot(dxMax, dyMax);
+
+        let minC = cornerRadius;
+        let closestCorner: ResizeHandle | null = null;
+
+        if (dLT <= minC) {
+            minC = dLT;
+            closestCorner = 'lt';
+        }
+        if (dRT <= minC) {
+            minC = dRT;
+            closestCorner = 'rt';
+        }
+        if (dLB <= minC) {
+            minC = dLB;
+            closestCorner = 'lb';
+        }
+        if (dRB <= minC) {
+            minC = dRB;
+            closestCorner = 'rb';
+        }
+
+        if (closestCorner) return closestCorner;
+
+        const inX = localPoint.x >= minX && localPoint.x <= maxX;
+        const inY = localPoint.y >= minY && localPoint.y <= maxY;
+
+        let minE = edgeRadius;
+        let closestEdge: ResizeHandle | null = null;
+
+        if (inY) {
+            if (dxMin <= minE) {
+                minE = dxMin;
+                closestEdge = 'l';
+            }
+            if (dxMax <= minE) {
+                minE = dxMax;
+                closestEdge = 'r';
+            }
+        }
+        if (inX) {
+            if (dyMin <= minE) {
+                minE = dyMin;
+                closestEdge = 't';
+            }
+            if (dyMax <= minE) {
+                minE = dyMax;
+                closestEdge = 'b';
+            }
+        }
+
+        return closestEdge;
     }
-
-    const box = shape.getLocalBox();
-    const pad = SELECTION_PADDING * zoomCoef;
-
-    const minX = box.minX - pad;
-    const maxX = box.maxX + pad;
-    const minY = box.minY - pad;
-    const maxY = box.maxY + pad;
-
-    const vLocalPoint = shape.toVLocalPoint(globalPoint);
-    const rawY = Math.min(box.minY * shape.scaleY, box.maxY * shape.scaleY);
-    const visualRotY = rawY - pad - 20 * zoomCoef;
-
-    if (Math.hypot(vLocalPoint.x, vLocalPoint.y - visualRotY) <= cornerRadius) {
-        return 'rot';
-    }
-
-    const localPoint = shape.toLocalPoint(globalPoint);
-    
-    const dxMin = Math.abs(localPoint.x - minX);
-    const dxMax = Math.abs(localPoint.x - maxX);
-    const dyMin = Math.abs(localPoint.y - minY);
-    const dyMax = Math.abs(localPoint.y - maxY);
-
-    const dLT = Math.hypot(dxMin, dyMin);
-    const dRT = Math.hypot(dxMax, dyMin);
-    const dLB = Math.hypot(dxMin, dyMax);
-    const dRB = Math.hypot(dxMax, dyMax);
-
-    let minC = cornerRadius;
-    let closestCorner: ResizeHandle | null = null;
-
-    if (dLT <= minC) { minC = dLT; closestCorner = 'lt'; }
-    if (dRT <= minC) { minC = dRT; closestCorner = 'rt'; }
-    if (dLB <= minC) { minC = dLB; closestCorner = 'lb'; }
-    if (dRB <= minC) { minC = dRB; closestCorner = 'rb'; }
-
-    if (closestCorner) return closestCorner;
-
-    const inX = localPoint.x >= minX && localPoint.x <= maxX;
-    const inY = localPoint.y >= minY && localPoint.y <= maxY;
-
-    let minE = edgeRadius;
-    let closestEdge: ResizeHandle | null = null;
-
-    if (inY) {
-        if (dxMin <= minE) { minE = dxMin; closestEdge = 'l'; }
-        if (dxMax <= minE) { minE = dxMax; closestEdge = 'r'; }
-    }
-    if (inX) {
-        if (dyMin <= minE) { minE = dyMin; closestEdge = 't'; }
-        if (dyMax <= minE) { minE = dyMax; closestEdge = 'b'; }
-    }
-
-    return closestEdge;
-}
 
     function getGlobalCursorStyle(handle: string): string {
         const map: Record<string, string> = {
@@ -349,10 +376,10 @@ function detectResizeHandle(
     } {
         const selectionBox = getVisualSelectionBox();
         if (!selectionBox) return { handle: null, isInside: false };
-        
+
         const zoomCoef = 100 / zoom.value;
         const padding = SELECTION_PADDING * zoomCoef;
-        
+
         const cornerRadius = 8 * zoomCoef;
         const edgeRadius = 4 * zoomCoef;
 
@@ -378,23 +405,47 @@ function detectResizeHandle(
         let minC = cornerRadius;
         let closestCorner: ResizeHandle | null = null;
 
-        if (dLT <= minC) { minC = dLT; closestCorner = 'lt'; }
-        if (dRT <= minC) { minC = dRT; closestCorner = 'rt'; }
-        if (dLB <= minC) { minC = dLB; closestCorner = 'lb'; }
-        if (dRB <= minC) { minC = dRB; closestCorner = 'rb'; }
+        if (dLT <= minC) {
+            minC = dLT;
+            closestCorner = 'lt';
+        }
+        if (dRT <= minC) {
+            minC = dRT;
+            closestCorner = 'rt';
+        }
+        if (dLB <= minC) {
+            minC = dLB;
+            closestCorner = 'lb';
+        }
+        if (dRB <= minC) {
+            minC = dRB;
+            closestCorner = 'rb';
+        }
 
-        if (closestCorner) return { handle: closestCorner, isInside: false }; 
+        if (closestCorner) return { handle: closestCorner, isInside: false };
 
         let minE = edgeRadius;
         let closestEdge: ResizeHandle | null = null;
 
         if (inY) {
-            if (dxMin <= minE) { minE = dxMin; closestEdge = 'l'; }
-            if (dxMax <= minE) { minE = dxMax; closestEdge = 'r'; }
+            if (dxMin <= minE) {
+                minE = dxMin;
+                closestEdge = 'l';
+            }
+            if (dxMax <= minE) {
+                minE = dxMax;
+                closestEdge = 'r';
+            }
         }
         if (inX) {
-            if (dyMin <= minE) { minE = dyMin; closestEdge = 't'; }
-            if (dyMax <= minE) { minE = dyMax; closestEdge = 'b'; }
+            if (dyMin <= minE) {
+                minE = dyMin;
+                closestEdge = 't';
+            }
+            if (dyMax <= minE) {
+                minE = dyMax;
+                closestEdge = 'b';
+            }
         }
 
         return { handle: closestEdge, isInside };
@@ -1208,7 +1259,7 @@ function detectResizeHandle(
                     canvasStore.selectionRect.end.y
                 ),
             };
-            const zoomCoef = 1 / zoom.value * 100;
+            const zoomCoef = (1 / zoom.value) * 100;
 
             const padding = SELECTION_PADDING * zoomCoef;
             const edgeThreshold = 8 * zoomCoef;

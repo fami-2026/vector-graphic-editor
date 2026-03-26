@@ -109,7 +109,7 @@ export class RectShape extends BaseShape {
 
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
-        ctx.lineJoin = 'round';        
+        ctx.lineJoin = 'round';
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeRect(-w / 2, -h / 2, w, h);
         ctx.globalAlpha = alpha;

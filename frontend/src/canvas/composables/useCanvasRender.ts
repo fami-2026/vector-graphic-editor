@@ -24,7 +24,7 @@ export function useCanvasRender(
         const m = shape.getVMatrix();
         ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
 
-        const zoomCoef = 1 / zoom.value * 100;
+        const zoomCoef = (1 / zoom.value) * 100;
 
         if (isLineShape(shape)) {
             const line = shape;
@@ -71,7 +71,7 @@ export function useCanvasRender(
             ctx.strokeRect(rectX, rectY, rectW, rectH);
 
             const visualAnchorY = rectY;
-            const visualRotY = visualAnchorY - 20 * zoomCoef;// + SELECTION_PADDING;
+            const visualRotY = visualAnchorY - 20 * zoomCoef; // + SELECTION_PADDING;
 
             ctx.beginPath();
             ctx.moveTo(0, visualAnchorY);
@@ -111,7 +111,7 @@ export function useCanvasRender(
 
     function drawSelectionRect(ctx: CanvasRenderingContext2D) {
         const canvas = canvasRef.value;
-        const zoomCoef = 1 / zoom.value * 100;
+        const zoomCoef = (1 / zoom.value) * 100;
 
         if (!canvas) return;
 

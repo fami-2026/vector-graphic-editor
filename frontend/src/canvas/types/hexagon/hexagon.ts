@@ -242,7 +242,7 @@ export class HexagonShape extends BaseShape {
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
-        ctx.lineJoin = 'round';        
+        ctx.lineJoin = 'round';
         ctx.stroke();
 
         ctx.restore();

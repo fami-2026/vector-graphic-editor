@@ -124,7 +124,7 @@ export class CircleShape extends BaseShape {
 
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
-        ctx.lineJoin = 'round';        
+        ctx.lineJoin = 'round';
         ctx.globalAlpha = this.strokeOpacity;
         ctx.stroke();
         ctx.globalAlpha = alpha;

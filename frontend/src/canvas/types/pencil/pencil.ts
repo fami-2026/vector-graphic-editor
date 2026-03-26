@@ -132,7 +132,7 @@ export class PencilShape extends BaseShape {
             y: p.y * this.scaleY,
         }));
 
-        const threshold = (this.strokeWidth / 2 + 5) * zoomCoef; 
+        const threshold = (this.strokeWidth / 2 + 5) * zoomCoef;
 
         if (scaled.length === 1) {
             const firstPoint = scaled[0];
