@@ -835,7 +835,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             syncDocumentTimer = null;
             void syncDocument();
         }, SYNC_DOCUMENT_DEBOUNCE_MS);
-    }    
+    }
 
     function exportToJson(): string {
         const payload: VectorEditorExport = {
