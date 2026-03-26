@@ -54,6 +54,13 @@ export class LineShape extends BaseShape {
         this.localEndPoint.y = height * signY;
     }
 
+    getVMatrix(): DOMMatrix {
+        const m = new DOMMatrix();
+        m.translateSelf(this.position.x, this.position.y);
+        m.rotateSelf(this.rotation);
+        return m;
+    }
+
     hitTest(globalPoint: Point, zoomCoef: number): boolean {
         const localPoint = this.toVLocalPoint(globalPoint);
         const dx = this.localEndPoint.x * this.scaleX;

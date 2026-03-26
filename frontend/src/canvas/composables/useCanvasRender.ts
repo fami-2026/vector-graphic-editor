@@ -65,49 +65,82 @@ export function useCanvasRender(
             const rectW = rawW + SELECTION_PADDING * 2 * zoomCoef;
             const rectH = rawH + SELECTION_PADDING * 2 * zoomCoef;
 
-            ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = Math.max(0.5, 1 * zoomCoef);
-            ctx.setLineDash([4 * zoomCoef, 4 * zoomCoef]);
-            ctx.strokeRect(rectX, rectY, rectW, rectH);
-
             const visualAnchorY = rectY;
             const visualRotY = visualAnchorY - 20 * zoomCoef; // + SELECTION_PADDING;
-
-            ctx.beginPath();
-            ctx.moveTo(0, visualAnchorY);
-            ctx.lineTo(0, visualRotY);
-            ctx.stroke();
-
-            ctx.lineWidth = 1 * zoomCoef;
-
-            ctx.setLineDash([0, 0]);
-            ctx.beginPath();
-            ctx.arc(0, visualRotY, HANDLE_RADIUS * zoomCoef, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-            ctx.stroke();
 
             const hX1 = rectX;
             const hY1 = rectY;
             const hX2 = rectX + rectW;
             const hY2 = rectY + rectH;
 
-            const handles: Array<[number, number]> = [
+            const handles: Array<[ResizeHandle, number, number]> = [
+                ['rot', 0, visualRotY],
+                ['lt', hX1, hY1],
+                ['rt', hX2, hY1],
+                ['rb', hX2, hY2],
+                ['lb', hX1, hY2],
+            ];
+
+            const borderLocalPoints: Array<[number, number]> = [
                 [hX1, hY1],
                 [hX2, hY1],
                 [hX2, hY2],
                 [hX1, hY2],
             ];
 
-            handles.forEach(([x, y]) => {
+            const borderPoints = borderLocalPoints.map(([x, y]) =>
+                new DOMPoint(x, y).matrixTransform(m)
+            );
+            const stemStart = new DOMPoint(0, visualAnchorY).matrixTransform(m);
+            const stemEnd = new DOMPoint(0, visualRotY).matrixTransform(m);
+
+            ctx.restore();
+
+            ctx.strokeStyle = '#2196F3';
+            ctx.lineWidth = Math.max(0.5, 1 * zoomCoef);
+            ctx.setLineDash([4 * zoomCoef, 4 * zoomCoef]);
+            ctx.beginPath();
+            const first = borderPoints[0];
+            if (first) {
+                ctx.moveTo(first.x, first.y);
+                for (let i = 1; i < borderPoints.length; i++) {
+                    const p = borderPoints[i];
+                    if (p) ctx.lineTo(p.x, p.y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(stemStart.x, stemStart.y);
+            ctx.lineTo(stemEnd.x, stemEnd.y);
+            ctx.stroke();
+
+            ctx.lineWidth = 1 * zoomCoef;
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#2196F3';
+
+            handles.forEach(([, x, y]) => {
+                const globalPoint = new DOMPoint(x, y).matrixTransform(m);
                 ctx.beginPath();
-                ctx.arc(x, y, HANDLE_RADIUS * zoomCoef, 0, Math.PI * 2);
+                ctx.arc(
+                    globalPoint.x,
+                    globalPoint.y,
+                    HANDLE_RADIUS * zoomCoef,
+                    0,
+                    Math.PI * 2
+                );
                 ctx.fill();
                 ctx.stroke();
             });
+
+            return;
         }
         ctx.restore();
     }
+
+    type ResizeHandle = 'lt' | 'rt' | 'rb' | 'lb' | 'rot';
 
     function drawSelectionRect(ctx: CanvasRenderingContext2D) {
         const canvas = canvasRef.value;

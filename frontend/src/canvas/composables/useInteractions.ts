@@ -61,6 +61,7 @@ export function useInteractions(
     const resizeStartInverse = ref<DOMMatrix | null>(null);
     const resizeStartScale = ref<Point>({ x: 1, y: 1 });
     const resizeStartRotation = ref<number>(0);
+    const rotateLastPointerAngle = ref<number | null>(null);
     const lineStartLocal = ref<Point | null>(null);
     const hasRecordedInteraction = ref(false);
     const hasMoved = ref(false);
@@ -103,6 +104,8 @@ export function useInteractions(
                 resizeStartLocalBox.value = null;
                 resizeStartMatrix.value = null;
                 resizeStartInverse.value = null;
+                resizeStartRotation.value = 0;
+                rotateLastPointerAngle.value = null;
                 lineStartLocal.value = null;
                 multiResizeStates.value.clear();
                 selectionStartBox.value = null;
@@ -219,16 +222,47 @@ export function useInteractions(
         const minY = box.minY - pad;
         const maxY = box.maxY + pad;
 
-        const vLocalPoint = shape.toVLocalPoint(globalPoint);
-        const rawY = Math.min(box.minY * shape.scaleY, box.maxY * shape.scaleY);
-        const visualRotY = rawY - pad - 20 * zoomCoef;
+        const x1 = box.minX * shape.scaleX;
+        const y1 = box.minY * shape.scaleY;
+        const x2 = box.maxX * shape.scaleX;
+        const y2 = box.maxY * shape.scaleY;
+        const rawX = Math.min(x1, x2);
+        const rawY = Math.min(y1, y2);
+        const rawW = Math.abs(x2 - x1);
+        const rawH = Math.abs(y2 - y1);
+        const rectX = rawX - pad;
+        const rectY = rawY - pad;
+        const rectW = rawW + pad * 2;
+        const rectH = rawH + pad * 2;
+        const visualRotY = rectY - 20 * zoomCoef;
 
-        if (
-            Math.hypot(vLocalPoint.x, vLocalPoint.y - visualRotY) <=
-            cornerRadius
-        ) {
-            return 'rot';
-        }
+        const hX1 = rectX;
+        const hY1 = rectY;
+        const hX2 = rectX + rectW;
+        const hY2 = rectY + rectH;
+        const vMatrix = shape.getVMatrix();
+
+        const handles: Array<[ResizeHandle, number, number]> = [
+            ['rot', 0, visualRotY],
+            ['lt', hX1, hY1],
+            ['rt', hX2, hY1],
+            ['rb', hX2, hY2],
+            ['lb', hX1, hY2],
+        ];
+
+        let closestHandle: ResizeHandle | null = null;
+        let closestDistance = cornerRadius;
+
+        handles.forEach(([handle, x, y]) => {
+            const p = new DOMPoint(x, y).matrixTransform(vMatrix);
+            const dist = Math.hypot(globalPoint.x - p.x, globalPoint.y - p.y);
+            if (dist <= closestDistance) {
+                closestDistance = dist;
+                closestHandle = handle;
+            }
+        });
+
+        if (closestHandle) return closestHandle;
 
         const localPoint = shape.toLocalPoint(globalPoint);
 
@@ -236,33 +270,6 @@ export function useInteractions(
         const dxMax = Math.abs(localPoint.x - maxX);
         const dyMin = Math.abs(localPoint.y - minY);
         const dyMax = Math.abs(localPoint.y - maxY);
-
-        const dLT = Math.hypot(dxMin, dyMin);
-        const dRT = Math.hypot(dxMax, dyMin);
-        const dLB = Math.hypot(dxMin, dyMax);
-        const dRB = Math.hypot(dxMax, dyMax);
-
-        let minC = cornerRadius;
-        let closestCorner: ResizeHandle | null = null;
-
-        if (dLT <= minC) {
-            minC = dLT;
-            closestCorner = 'lt';
-        }
-        if (dRT <= minC) {
-            minC = dRT;
-            closestCorner = 'rt';
-        }
-        if (dLB <= minC) {
-            minC = dLB;
-            closestCorner = 'lb';
-        }
-        if (dRB <= minC) {
-            minC = dRB;
-            closestCorner = 'rb';
-        }
-
-        if (closestCorner) return closestCorner;
 
         const inX = localPoint.x >= minX && localPoint.x <= maxX;
         const inY = localPoint.y >= minY && localPoint.y <= maxY;
@@ -558,6 +565,7 @@ export function useInteractions(
                     isResizing.value = true;
                     resizeHandle.value = handle;
                     hasMoved.value = false;
+                    dragStart.value = point;
 
                     resizeStartLocalBox.value = activeShape.value.getLocalBox();
                     resizeStartMatrix.value = activeShape.value.getMatrix();
@@ -567,6 +575,17 @@ export function useInteractions(
                         x: activeShape.value.scaleX,
                         y: activeShape.value.scaleY,
                     };
+                    resizeStartRotation.value = activeShape.value.rotation;
+
+                    if (handle === 'rot') {
+                        const center = activeShape.value.position;
+                        rotateLastPointerAngle.value = Math.atan2(
+                            point.y - center.y,
+                            point.x - center.x
+                        );
+                    } else {
+                        rotateLastPointerAngle.value = null;
+                    }
 
                     if (activeShape.value.type === 'line') {
                         const line = activeShape.value as LineShape;
@@ -1052,9 +1071,20 @@ export function useInteractions(
                     point.y - center.y,
                     point.x - center.x
                 );
+                if (rotateLastPointerAngle.value === null) {
+                    rotateLastPointerAngle.value = angle;
+                }
 
-                const deg = (angle + Math.PI / 2) * (180 / Math.PI);
-                activeShape.value.rotation = (deg + 360) % 360;
+                const deltaAngle = angle - rotateLastPointerAngle.value;
+                const normalizedDelta = Math.atan2(
+                    Math.sin(deltaAngle),
+                    Math.cos(deltaAngle)
+                );
+                const deltaDeg = normalizedDelta * (180 / Math.PI);
+
+                activeShape.value.rotation =
+                    (activeShape.value.rotation + deltaDeg + 360) % 360;
+                rotateLastPointerAngle.value = angle;
 
                 canvas.style.cursor = getCursorStyle(handle, activeShape.value);
                 return;
@@ -1422,6 +1452,7 @@ export function useInteractions(
         resizeStartMatrix.value = null;
         resizeStartInverse.value = null;
         resizeStartRotation.value = 0;
+        rotateLastPointerAngle.value = null;
         lineStartLocal.value = null;
 
         onMouseMove(e);

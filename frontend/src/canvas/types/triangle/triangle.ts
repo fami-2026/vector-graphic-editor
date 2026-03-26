@@ -94,30 +94,20 @@ export class TriangleShape extends BaseShape {
         this.height = height;
     }
 
-    private getVertices(): Point[] {
-        const rotationRad = (this.rotation * Math.PI) / 180;
-        const cos = Math.cos(rotationRad);
-        const sin = Math.sin(rotationRad);
-
+    private getLocalPoints(): Point[] {
         const halfW = this.width / 2;
         const halfH = this.height / 2;
 
-        const localPoints = [
-            // { x: -halfW * this.scaleX, y: -halfH * this.scaleY },
+        return [
             { x: 0, y: -halfH * this.scaleY },
             { x: -halfW * this.scaleX, y: halfH * this.scaleY },
             { x: halfW * this.scaleX, y: halfH * this.scaleY },
         ];
-
-        return localPoints.map((p) => ({
-            x: this.position.x + p.x * cos - p.y * sin,
-            y: this.position.y + p.x * sin + p.y * cos,
-        }));
     }
 
-    hitTest(point: Point, zoomCoef: number): boolean {
-        const vertices = this.getVertices();
-
+    hitTest(globalPoint: Point, zoomCoef: number): boolean {
+        const localPoint = this.toVLocalPoint(globalPoint);
+        const vertices = this.getLocalPoints();
         const p1 = vertices[0];
         const p2 = vertices[1];
         const p3 = vertices[2];
@@ -135,29 +125,29 @@ export class TriangleShape extends BaseShape {
         const area1 =
             0.5 *
             Math.abs(
-                (p1.x - point.x) * (p2.y - point.y) -
-                    (p2.x - point.x) * (p1.y - point.y)
+                (p1.x - localPoint.x) * (p2.y - localPoint.y) -
+                    (p2.x - localPoint.x) * (p1.y - localPoint.y)
             );
         const area2 =
             0.5 *
             Math.abs(
-                (p2.x - point.x) * (p3.y - point.y) -
-                    (p3.x - point.x) * (p2.y - point.y)
+                (p2.x - localPoint.x) * (p3.y - localPoint.y) -
+                    (p3.x - localPoint.x) * (p2.y - localPoint.y)
             );
         const area3 =
             0.5 *
             Math.abs(
-                (p3.x - point.x) * (p1.y - point.y) -
-                    (p1.x - point.x) * (p3.y - point.y)
+                (p3.x - localPoint.x) * (p1.y - localPoint.y) -
+                    (p1.x - localPoint.x) * (p3.y - localPoint.y)
             );
 
         if (Math.abs(area - (area1 + area2 + area3)) < 0.1) {
             return true;
         }
 
-        const dist1 = this.distanceToSegment(point, p1, p2);
-        const dist2 = this.distanceToSegment(point, p2, p3);
-        const dist3 = this.distanceToSegment(point, p3, p1);
+        const dist1 = this.distanceToSegment(localPoint, p1, p2);
+        const dist2 = this.distanceToSegment(localPoint, p2, p3);
+        const dist3 = this.distanceToSegment(localPoint, p3, p1);
 
         return Math.min(dist1, dist2, dist3) <= padding;
     }
@@ -185,26 +175,20 @@ export class TriangleShape extends BaseShape {
     }
 
     getBoundingBox(): BoundingBox {
-        const vertices = this.getVertices();
-
-        let minX = Infinity,
-            minY = Infinity,
-            maxX = -Infinity,
-            maxY = -Infinity;
-
-        for (const v of vertices) {
-            minX = Math.min(minX, v.x);
-            minY = Math.min(minY, v.y);
-            maxX = Math.max(maxX, v.x);
-            maxY = Math.max(maxY, v.y);
-        }
+        const localBox = this.getLocalBox();
+        const corners = [
+            this.toGlobalPoint({ x: localBox.minX, y: localBox.minY }),
+            this.toGlobalPoint({ x: localBox.maxX, y: localBox.minY }),
+            this.toGlobalPoint({ x: localBox.maxX, y: localBox.maxY }),
+            this.toGlobalPoint({ x: localBox.minX, y: localBox.maxY }),
+        ];
 
         const padding = this.strokeWidth / 2 + 5;
         return {
-            minX: minX - padding,
-            minY: minY - padding,
-            maxX: maxX + padding,
-            maxY: maxY + padding,
+            minX: Math.min(...corners.map((p) => p.x)) - padding,
+            minY: Math.min(...corners.map((p) => p.y)) - padding,
+            maxX: Math.max(...corners.map((p) => p.x)) + padding,
+            maxY: Math.max(...corners.map((p) => p.y)) + padding,
         };
     }
 
@@ -220,14 +204,17 @@ export class TriangleShape extends BaseShape {
     }
 
     render(ctx: CanvasRenderingContext2D): void {
-        const vertices = this.getVertices();
-
+        const vertices = this.getLocalPoints();
         const p1 = vertices[0];
         const p2 = vertices[1];
         const p3 = vertices[2];
-
         if (!p1 || !p2 || !p3) return;
 
+        ctx.save();
+        const m = this.getVMatrix();
+        ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+
+        const alpha = ctx.globalAlpha;
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
@@ -244,7 +231,8 @@ export class TriangleShape extends BaseShape {
         ctx.lineJoin = 'round';
         ctx.stroke();
 
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = alpha;
+        ctx.restore();
     }
 
     move(delta: Point): void {
