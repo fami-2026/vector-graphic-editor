@@ -2,6 +2,7 @@ import type { Ref } from 'vue';
 import type { Shape, LineShape } from '@/canvas/types';
 import { SELECTION_PADDING } from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
+import type { TrapezoidShape } from '@/canvas/types/trapezoid/trapezoid';
 
 function isLineShape(shape: Shape): shape is LineShape {
     return shape.type === 'line';
@@ -24,17 +25,15 @@ export function useCanvasRender(
         const m = shape.getVMatrix();
         ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
 
-        const zoomCoef = (1 / zoom.value) * 100;
-
         if (isLineShape(shape)) {
             const line = shape;
 
             ctx.fillStyle = '#ffffff';
             ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = 1.5 * zoomCoef;
+            ctx.lineWidth = 1.5;
 
             ctx.beginPath();
-            ctx.arc(0, 0, HANDLE_RADIUS * zoomCoef, 0, Math.PI * 2);
+            ctx.arc(0, 0, 4, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
 
@@ -43,7 +42,7 @@ export function useCanvasRender(
                 const ey = line.localEndPoint.y * line.scaleY;
 
                 ctx.beginPath();
-                ctx.arc(ex, ey, HANDLE_RADIUS * zoomCoef, 0, Math.PI * 2);
+                ctx.arc(ex, ey, 4, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             }
@@ -60,29 +59,27 @@ export function useCanvasRender(
             const rawW = Math.abs(x2 - x1);
             const rawH = Math.abs(y2 - y1);
 
-            const rectX = rawX - SELECTION_PADDING * zoomCoef;
-            const rectY = rawY - SELECTION_PADDING * zoomCoef;
-            const rectW = rawW + SELECTION_PADDING * 2 * zoomCoef;
-            const rectH = rawH + SELECTION_PADDING * 2 * zoomCoef;
+            const rectX = rawX - SELECTION_PADDING;
+            const rectY = rawY - SELECTION_PADDING;
+            const rectW = rawW + SELECTION_PADDING * 2;
+            const rectH = rawH + SELECTION_PADDING * 2;
 
             ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = Math.max(0.5, 1 * zoomCoef);
-            ctx.setLineDash([4 * zoomCoef, 4 * zoomCoef]);
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
             ctx.strokeRect(rectX, rectY, rectW, rectH);
 
             const visualAnchorY = rectY;
-            const visualRotY = visualAnchorY - 20 * zoomCoef; // + SELECTION_PADDING;
+            const visualRotY = visualAnchorY - 20 + SELECTION_PADDING;
 
             ctx.beginPath();
             ctx.moveTo(0, visualAnchorY);
             ctx.lineTo(0, visualRotY);
             ctx.stroke();
 
-            ctx.lineWidth = 1 * zoomCoef;
-
             ctx.setLineDash([0, 0]);
             ctx.beginPath();
-            ctx.arc(0, visualRotY, HANDLE_RADIUS * zoomCoef, 0, Math.PI * 2);
+            ctx.arc(0, visualRotY, 4, 0, Math.PI * 2);
             ctx.fillStyle = '#fff';
             ctx.fill();
             ctx.stroke();
@@ -101,18 +98,36 @@ export function useCanvasRender(
 
             handles.forEach(([x, y]) => {
                 ctx.beginPath();
-                ctx.arc(x, y, HANDLE_RADIUS * zoomCoef, 0, Math.PI * 2);
+                ctx.arc(x, y, HANDLE_RADIUS, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             });
+
+            if (shape.type === 'trapezoid') {
+                const trap = shape as TrapezoidShape;
+                const halfH = trap.height / 2;
+                const tlX = trap.topLeftX * trap.scaleX;
+                const trX = trap.topRightX * trap.scaleX;
+                const topY = -halfH * trap.scaleY;
+
+                ctx.setLineDash([0, 0]);
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#ff9800';
+                ctx.lineWidth = 1.5;
+
+                for (const [vx, vy] of [[tlX, topY], [trX, topY]] as [number, number][]) {
+                    ctx.beginPath();
+                    ctx.arc(vx, vy, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
         }
         ctx.restore();
     }
 
     function drawSelectionRect(ctx: CanvasRenderingContext2D) {
         const canvas = canvasRef.value;
-        const zoomCoef = (1 / zoom.value) * 100;
-
         if (!canvas) return;
 
         if (
@@ -131,8 +146,8 @@ export function useCanvasRender(
             };
 
             ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = 2 * zoomCoef;
-            ctx.setLineDash([5 * zoomCoef, 5 * zoomCoef]);
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
             ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
 
             ctx.fillStyle = 'rgba(33, 150, 243, 0.1)';
@@ -165,8 +180,8 @@ export function useCanvasRender(
             };
 
             ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = 2 * zoomCoef;
-            ctx.setLineDash([5 * zoomCoef, 5 * zoomCoef]);
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
             ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
 
             ctx.fillStyle = 'rgba(33, 150, 243, 0.05)';
@@ -175,7 +190,7 @@ export function useCanvasRender(
 
             ctx.fillStyle = '#ffffff';
             ctx.strokeStyle = '#2196F3';
-            ctx.lineWidth = 1.5 * zoomCoef;
+            ctx.lineWidth = 1.5;
 
             const handles: Array<[number, number]> = [
                 [rect.x, rect.y],
@@ -186,7 +201,7 @@ export function useCanvasRender(
 
             handles.forEach(([x, y]) => {
                 ctx.beginPath();
-                ctx.arc(x, y, HANDLE_RADIUS * zoomCoef, 0, Math.PI * 2);
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             });

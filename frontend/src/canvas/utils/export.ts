@@ -1,7 +1,7 @@
 import type { Shape, Point } from '@/canvas/types';
 
 export type ExportFormat = 'png' | 'svg';
-export type ExportArea = 'scene' | 'region';
+export type ExportArea = 'scene';
 export type PngScale = 1 | 2 | 3;
 export type ExportBackground = 'transparent' | 'white' | string;
 
@@ -19,7 +19,6 @@ export interface ExportOptions {
     sceneSize: ExportSceneSize;
     pngScale?: PngScale;
     background?: ExportBackground;
-    regionBounds?: { x: number; y: number; width: number; height: number };
 }
 
 interface ExportBounds {
@@ -74,9 +73,7 @@ export async function exportScene(options: ExportOptions): Promise<void> {
         throw new Error('Нет фигур для экспорта.');
     }
 
-    if (options.shapes.length > 0) {
-        validateShapeBounds(options.shapes);
-    }
+    validateShapeBounds(options.shapes);
 
     const fileName = ensureExtension(options.fileName, options.format);
 
@@ -88,20 +85,6 @@ export async function exportScene(options: ExportOptions): Promise<void> {
 }
 
 function resolveExportTarget(options: ExportOptions): ExportTarget | null {
-    if (options.area === 'region') {
-        if (!options.regionBounds) return null;
-        const { x, y, width, height } = options.regionBounds;
-        return {
-            shapes: options.shapes,
-            bounds: {
-                x,
-                y,
-                width: Math.max(1, width),
-                height: Math.max(1, height),
-            },
-        };
-    }
-
     if (options.shapes.length === 0) return null;
 
     const bounds = getTotalBounds(options.shapes);
@@ -281,7 +264,7 @@ function shapeToSvgElement(shape: Shape): string | null {
                 .join(' ');
             return `<polygon points="${pointsStr}"${transform}${style}/>`;
         }
-        case 'parallelogram': {
+        case 'trapezoid': {
             if (!s.getLocalPoints) return null;
             const points = s.getLocalPoints();
             if (!points || points.length === 0) return null;

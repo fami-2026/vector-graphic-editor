@@ -57,7 +57,6 @@ type VectorEditorExport = {
     format: 'vector-editor';
     version: 1;
     exportedAt: string;
-    backgroundColor: string;
     scene: SceneSnapshot;
 };
 
@@ -90,9 +89,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     let isContinuousChangeActive = false;
     let continuousChangeTimer: number | null = null;
-    let syncDocumentTimer: number | null = null;
     const CONTINUOUS_CHANGE_TIMEOUT = 700;
-    const SYNC_DOCUMENT_DEBOUNCE_MS = 400;
     const selectedShapes = computed(() =>
         shapes.value.filter((s) => selectedIds.value.includes(s.id))
     );
@@ -234,7 +231,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function endInteraction() {
         isInteractionActive.value = false;
-        scheduleDocumentSync();
     }
 
     function ensureHistoryForContinuousChange() {
@@ -262,7 +258,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         const current = createSnapshot();
         redoStack.value.push(current);
         restoreSnapshot(snapshot);
-        scheduleDocumentSync();
     }
 
     function redo() {
@@ -272,7 +267,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         const current = createSnapshot();
         undoStack.value.push(current);
         restoreSnapshot(snapshot);
-        scheduleDocumentSync();
     }
 
     const canUndo = computed(() => undoStack.value.length > 0);
@@ -397,8 +391,6 @@ export const useCanvasStore = defineStore('canvas', () => {
             selectionRect.value.end.x += delta.x;
             selectionRect.value.end.y += delta.y;
         }
-
-        scheduleDocumentSync();
     }
 
     function deleteSelectedShapes() {
@@ -411,7 +403,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         selectedIds.value = [];
         selectedId.value = null;
         selectionRect.value = null;
-        scheduleDocumentSync();
     }
 
     function selectAll() {
@@ -477,10 +468,10 @@ export const useCanvasStore = defineStore('canvas', () => {
                             ? 'Стрелка'
                             : type === 'hexagon'
                               ? 'Шестиугольник'
-                              : type === 'parallelogram'
-                                ? 'Параллелограмм'
-                                : type === 'pencil'
-                                  ? 'Карандаш'
+                              : type === 'pencil'
+                                ? 'Карандаш'
+                                : type === 'trapezoid'
+                                  ? 'Трапеция'
                                   : type;
 
         const number = existingShapesOfType.length + 1;
@@ -504,14 +495,12 @@ export const useCanvasStore = defineStore('canvas', () => {
             );
             (shape as Shape).name = defaultName;
             shapes.value.push(shape);
-            scheduleDocumentSync();
             return shape;
         }
 
         shape = shapeRegistry.create(type, generateId(), pos);
         (shape as Shape).name = defaultName;
         shapes.value.push(shape);
-        scheduleDocumentSync();
         return shape;
     }
 
@@ -531,7 +520,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         ensureHistoryForContinuousChange();
         Object.assign(shape, updates);
         shapes.value = [...shapes.value];
-        scheduleDocumentSync();
     }
 
     function deleteShape(id: string) {
@@ -542,7 +530,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         if (selectedIds.value.length === 0) {
             selectionRect.value = null;
         }
-        scheduleDocumentSync();
     }
 
     function moveShape(fromIndex: number, toIndex: number) {
@@ -563,7 +550,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
         next.splice(toIndex, 0, item);
         shapes.value = next;
-        scheduleDocumentSync();
     }
 
     function setZoom(value: number) {
@@ -829,23 +815,11 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
     }
 
-    function scheduleDocumentSync() {
-        if (syncDocumentTimer !== null) {
-            window.clearTimeout(syncDocumentTimer);
-        }
-
-        syncDocumentTimer = window.setTimeout(() => {
-            syncDocumentTimer = null;
-            void syncDocument();
-        }, SYNC_DOCUMENT_DEBOUNCE_MS);
-    }
-
     function exportToJson(): string {
         const payload: VectorEditorExport = {
             format: 'vector-editor',
             version: 1,
             exportedAt: new Date().toISOString(),
-            backgroundColor: backgroundColor.value,
             scene: createSnapshot(),
         };
 
@@ -875,9 +849,6 @@ export const useCanvasStore = defineStore('canvas', () => {
             }
 
             restoreSnapshot(parsed.scene);
-            if (parsed.backgroundColor) {
-                setBackgroundColor(parsed.backgroundColor);
-            }
             undoStack.value = [];
             redoStack.value = [];
             isInteractionActive.value = false;
@@ -886,8 +857,6 @@ export const useCanvasStore = defineStore('canvas', () => {
                 window.clearTimeout(continuousChangeTimer);
                 continuousChangeTimer = null;
             }
-
-            scheduleDocumentSync();
 
             return { success: true, message: 'Проект успешно импортирован.' };
         } catch (error) {
@@ -914,7 +883,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         ],
         () => {
             saveToLocalStorage();
-            scheduleDocumentSync();
+            void syncDocument();
         },
         { deep: true }
     );
