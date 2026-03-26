@@ -353,22 +353,16 @@
                                     />
                                 </g>
 
-                                <!-- Стрелка (линия с наконечником) -->
-                                <g v-else-if="shape.type === 'arrow'">
-                                    <line
-                                        x1="3"
-                                        y1="10"
-                                        x2="16"
-                                        y2="10"
-                                        :stroke="thumbStroke(shape)"
-                                        stroke-width="1.5"
-                                        stroke-linecap="round"
-                                    />
-                                    <polygon
-                                        points="16,7 19,10 16,13"
-                                        :fill="thumbStroke(shape)"
-                                    />
-                                </g>
+                                <!-- Карандаш -->
+                                <polyline
+                                    v-else-if="shape.type === 'pencil'"
+                                    points="2,13 6,9 9,12 13,6 18,10"
+                                    fill="none"
+                                    :stroke="thumbStroke(shape)"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
 
                                 <!-- Все остальные полигональные фигуры -->
                                 <polygon
