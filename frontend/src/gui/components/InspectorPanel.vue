@@ -336,22 +336,7 @@
                                     stroke-linecap="round"
                                 />
                                 
-                                  <!-- Стрелка (линия с наконечником) -->
-                                <g v-else-if="shape.type === 'arrow'">
-                                    <line
-                                        x1="3"
-                                        y1="10"
-                                        x2="16"
-                                        y2="10"
-                                        :stroke="thumbStroke(shape)"
-                                        stroke-width="1.5"
-                                        stroke-linecap="round"
-                                    />
-                                    <polygon
-                                        points="16,7 19,10 16,13"
-                                        :fill="thumbStroke(shape)"
-                                    />
-                                </g>
+                                
 
                                 <!-- Карандаш -->
                                 <polyline
