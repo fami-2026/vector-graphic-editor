@@ -93,7 +93,12 @@ function resolveExportTarget(options: ExportOptions): ExportTarget | null {
         const { x, y, width, height } = options.regionBounds;
         return {
             shapes: options.shapes,
-            bounds: { x, y, width: Math.max(1, width), height: Math.max(1, height) },
+            bounds: {
+                x,
+                y,
+                width: Math.max(1, width),
+                height: Math.max(1, height),
+            },
         };
     }
 

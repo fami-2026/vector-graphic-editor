@@ -65,7 +65,9 @@
                 height: regionRect.height + 'px',
             }"
         ></div>
-        <div class="regionHint">Нарисуйте область для экспорта · Esc — отмена</div>
+        <div class="regionHint">
+            Нарисуйте область для экспорта · Esc — отмена
+        </div>
     </div>
 
     <div
@@ -99,11 +101,18 @@
             </label>
 
             <div v-if="form.area === 'region'" class="field">
-                <button type="button" class="btn ghost regionBtn" @click="startRegionSelect">
-                    {{ regionBounds ? 'Изменить область' : 'Выбрать на холсте' }}
+                <button
+                    type="button"
+                    class="btn ghost regionBtn"
+                    @click="startRegionSelect"
+                >
+                    {{
+                        regionBounds ? 'Изменить область' : 'Выбрать на холсте'
+                    }}
                 </button>
                 <span v-if="regionBounds" class="hint">
-                    {{ Math.round(regionBounds.width) }} × {{ Math.round(regionBounds.height) }} px
+                    {{ Math.round(regionBounds.width) }} ×
+                    {{ Math.round(regionBounds.height) }} px
                 </span>
                 <span v-else class="hint">Область не выбрана</span>
             </div>
@@ -158,7 +167,8 @@ const open = ref(false);
 const showExport = ref(false);
 const root = ref<HTMLElement | null>(null);
 const canvasStore = useCanvasStore();
-const { shapes, selectedId, backgroundColor, zoom, pan } = storeToRefs(canvasStore);
+const { shapes, selectedId, backgroundColor, zoom, pan } =
+    storeToRefs(canvasStore);
 
 const form = reactive<{
     fileName: string;
@@ -175,7 +185,12 @@ const form = reactive<{
 });
 
 const isSelectingRegion = ref(false);
-const regionBounds = ref<{ x: number; y: number; width: number; height: number } | null>(null);
+const regionBounds = ref<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+} | null>(null);
 const regionStart = ref<{ x: number; y: number } | null>(null);
 const regionCurrent = ref<{ x: number; y: number } | null>(null);
 
@@ -219,8 +234,13 @@ function startRegionSelect() {
     regionCurrent.value = null;
 }
 
-function screenToWorld(clientX: number, clientY: number): { x: number; y: number } {
-    const canvas = document.querySelector('.main-canvas') as HTMLCanvasElement | null;
+function screenToWorld(
+    clientX: number,
+    clientY: number
+): { x: number; y: number } {
+    const canvas = document.querySelector(
+        '.main-canvas'
+    ) as HTMLCanvasElement | null;
     const rect = canvas?.getBoundingClientRect();
     if (!rect) return { x: clientX, y: clientY };
     const zoomFactor = zoom.value / 100;
@@ -332,7 +352,10 @@ async function submitExport() {
             selectedId: selectedId.value,
             pngScale: form.pngScale,
             background: resolveExportBackground(),
-            regionBounds: form.area === 'region' ? (regionBounds.value ?? undefined) : undefined,
+            regionBounds:
+                form.area === 'region'
+                    ? (regionBounds.value ?? undefined)
+                    : undefined,
         });
 
         closeExport();
