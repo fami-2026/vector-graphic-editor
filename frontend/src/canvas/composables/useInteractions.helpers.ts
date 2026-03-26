@@ -65,6 +65,7 @@ export function detectResizeHandle(
     const rectY = rawY - pad;
     const rectW = rawW + pad * 2;
     const rectH = rawH + pad * 2;
+    // Ручка поворота вынесена выше рамки, чтобы не конфликтовать с верхними углами ресайза.
     const visualRotY = rectY - 20 * zoomCoef;
 
     const hX1 = rectX;
@@ -84,6 +85,8 @@ export function detectResizeHandle(
     let closestHandle: ResizeHandle | null = null;
     let closestDistance = cornerRadius;
 
+    // Берем ближайший хэндл в пределах радиуса, чтобы при плотном масштабе
+    // не было "мигания" между соседними ручками.
     handles.forEach(([handle, x, y]) => {
         const p = new DOMPoint(x, y).matrixTransform(vMatrix);
         const dist = Math.hypot(globalPoint.x - p.x, globalPoint.y - p.y);
@@ -262,6 +265,8 @@ export function hitTestSelectionBox(
 
     if (closestCorner) return { handle: closestCorner, isInside: false };
 
+    // Углы имеют приоритет над гранями: это делает поведение предсказуемым
+    // в зонах, где hit-радиусы пересекаются.
     let minE = edgeRadius;
     let closestEdge: ResizeHandle | null = null;
 

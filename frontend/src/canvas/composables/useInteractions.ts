@@ -103,6 +103,8 @@ export function useInteractions(
 
     function startInteractionIfNeeded() {
         if (hasRecordedInteraction.value) return;
+        // Один жест = одна запись в историю.
+        // Так drag/resize не превращаются в сотни шагов undo.
         canvasStore.startInteraction();
         hasRecordedInteraction.value = true;
     }
@@ -450,6 +452,8 @@ export function useInteractions(
     watch(
         () => toolsStore.activeTool,
         (newTool) => {
+            // Если вышли из режима select, сбрасываем выделение сразу.
+            // Это предотвращает "залипание" resize/drag состояния при смене инструмента.
             if (newTool !== 'select') {
                 canvasStore.clearSelection();
                 activeShape.value = null;
@@ -467,6 +471,8 @@ export function useInteractions(
                 ) ?? null;
             activeShape.value = selected;
 
+            // Когда выбор исчезает полностью, важно зачистить временные флаги.
+            // Иначе следующий жест может стартовать из устаревшей промежуточной стадии.
             if (!selected && canvasStore.selectedIds.length === 0) {
                 isDragging.value = false;
                 resetResizeState();
@@ -508,6 +514,8 @@ export function useInteractions(
             const centerY = rect.height / 2;
             const oldZoom = zoom.value;
 
+            // Вычисляем мировую точку под курсором до изменения зума,
+            // чтобы после масштабирования оставить её под тем же пикселем.
             const worldX = getLocalPoint(e).x;
             const worldY = getLocalPoint(e).y;
 
@@ -547,6 +555,8 @@ export function useInteractions(
         return null;
     }
     function onMouseDown(e: MouseEvent) {
+        // Ветки идут от самых "эксклюзивных" режимов к общему select:
+        // если рано не выйти, select-пайплайн перехватит событие и даст неверный сценарий.
         if (
             e.button === 1 ||
             (toolsStore.activeTool === 'hand' && e.button === 0)
@@ -779,6 +789,8 @@ export function useInteractions(
 
             const forceProportional =
                 shift || hasRotatedShapes(multiResizeStates.value);
+            // Для группы с поворотом свободный ресайз визуально "ломает" композицию.
+            // Поэтому удерживаем единый коэффициент масштаба даже без shift.
 
             let rawMinX = startBox.minX,
                 rawMaxX = startBox.maxX;
@@ -879,6 +891,8 @@ export function useInteractions(
             multiResizeStates.value.forEach((state) => {
                 const shape = state.shape;
 
+                // relX/relY хранят положение фигуры относительно центра группы.
+                // Это позволяет масштабировать всю группу как целостный блок.
                 const relX = (state.startPosition.x - oldCenterX) / (origW / 2);
                 const relY = (state.startPosition.y - oldCenterY) / (origH / 2);
 
@@ -991,6 +1005,8 @@ export function useInteractions(
 
             if (e.shiftKey) {
                 if (shape.type === 'line') {
+                    // Линии по shift снапаются к 45° шагу:
+                    // это ускоряет построение ровных осей и диагоналей.
                     const length = Math.sqrt(distanceSq);
                     if (length > 0) {
                         const angle = Math.atan2(dy, dx);
@@ -1060,6 +1076,8 @@ export function useInteractions(
                 }
 
                 const deltaAngle = angle - rotateLastPointerAngle.value;
+                // Нормализация через sin/cos убирает скачки на границе -PI/PI,
+                // чтобы поворот не "переворачивался" при проходе через 180°.
                 const normalizedDelta = Math.atan2(
                     Math.sin(deltaAngle),
                     Math.cos(deltaAngle)

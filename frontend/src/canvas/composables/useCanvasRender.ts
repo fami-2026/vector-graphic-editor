@@ -94,6 +94,8 @@ export function useCanvasRender(
             const stemStart = new DOMPoint(0, visualAnchorY).matrixTransform(m);
             const stemEnd = new DOMPoint(0, visualRotY).matrixTransform(m);
 
+            // Рамку выделения и ручки рисуем уже в screen-space:
+            // так толщина/штрих не искажаются от scale/rotation самой фигуры.
             ctx.restore();
 
             ctx.strokeStyle = '#2196F3';
@@ -178,6 +180,8 @@ export function useCanvasRender(
             !canvasStore.isSelecting &&
             canvasStore.selectedIds.length > 1
         ) {
+            // Рамка группы показывается только для множественного выбора:
+            // для одиночной фигуры используется её собственный bbox с ручками.
             const rect = {
                 x: Math.min(
                     canvasStore.selectionRect.start.x,
@@ -238,6 +242,8 @@ export function useCanvasRender(
         const zoomFactor = zoom.value / 100;
         ctx.save();
 
+        // Единый центрированный transform гарантирует, что pan/zoom одинаково
+        // применяются и к фигурам, и к вспомогательной графике выделения.
         ctx.translate(
             canvas.width / 2 + pan.value.x,
             canvas.height / 2 + pan.value.y
@@ -251,6 +257,8 @@ export function useCanvasRender(
             ctx.restore();
         }
 
+        // Второй проход нужен, чтобы выделение всегда лежало поверх фигур
+        // и не перекрывалось их собственной отрисовкой.
         for (const shape of shapes.value) {
             if (canvasStore.selectedIds.includes(shape.id)) {
                 drawSelectionBox(ctx, shape);
