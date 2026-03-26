@@ -233,6 +233,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     function endInteraction() {
         isInteractionActive.value = false;
+        scheduleDocumentSync();
     }
 
     function ensureHistoryForContinuousChange() {
