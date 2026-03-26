@@ -124,17 +124,15 @@ export class PencilShape extends BaseShape {
         }));
     }
 
-    hitTest(globalPoint: Point): boolean {
+    hitTest(globalPoint: Point, zoomCoef: number): boolean {
         if (!this.points.length) return false;
-
         const localPoint = this.toVLocalPoint(globalPoint);
-
         const scaled = this.points.map((p) => ({
             x: p.x * this.scaleX,
             y: p.y * this.scaleY,
         }));
 
-        const threshold = this.strokeWidth / 2 + 5;
+        const threshold = (this.strokeWidth / 2 + 5) * zoomCoef; 
 
         if (scaled.length === 1) {
             const firstPoint = scaled[0];

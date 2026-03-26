@@ -177,81 +177,95 @@ export function useInteractions(
     }
 
     function hitTest(point: Point): Shape | null {
+        const zoomCoef = 1 / zoom.value * 100;
         for (let i = shapes.value.length - 1; i >= 0; i--) {
             const shape = shapes.value[i];
-            if (shape?.hitTest(point)) return shape;
+            if (shape?.hitTest(point, zoomCoef)) return shape; 
         }
         return null;
     }
 
-    function detectResizeHandle(
-        shape: Shape,
-        globalPoint: Point
-    ): ResizeHandle | null {
-        const localPoint = shape.toLocalPoint(globalPoint);
-        const edgeX = 4 / Math.abs(shape.scaleX);
-        const edgeY = 4 / Math.abs(shape.scaleY);
+function detectResizeHandle(
+    shape: Shape,
+    globalPoint: Point
+): ResizeHandle | null {
+    const zoomCoef = 100 / zoom.value; 
+    const cornerRadius = 8 * zoomCoef;
+    const edgeRadius = 4 * zoomCoef;
 
-        if (shape.type === 'line') {
-            const line = shape as LineShape;
-            if (line.localEndPoint) {
-                const vInv = line.getInverseVMatrix();
-                const vPt = new DOMPoint(
-                    globalPoint.x,
-                    globalPoint.y
-                ).matrixTransform(vInv);
+    if (shape.type === 'line') {
+        const line = shape as LineShape;
+        if (!line.localEndPoint) return null;
 
-                const ex = line.localEndPoint.x * line.scaleX;
-                const ey = line.localEndPoint.y * line.scaleY;
+        const vPt = line.toVLocalPoint(globalPoint);
+        
+        const ex = line.localEndPoint.x * line.scaleX;
+        const ey = line.localEndPoint.y * line.scaleY;
 
-                if (Math.hypot(vPt.x, vPt.y) <= 8) return 's';
-                if (Math.hypot(vPt.x - ex, vPt.y - ey) <= 8) return 'e';
-            }
-            return null;
-        }
-        const box = shape.getLocalBox();
+        const distS = Math.hypot(vPt.x, vPt.y);
+        const distE = Math.hypot(vPt.x - ex, vPt.y - ey);
 
-        const padX = SELECTION_PADDING / Math.max(Math.abs(shape.scaleX), 0.01);
-        const padY = SELECTION_PADDING / Math.max(Math.abs(shape.scaleY), 0.01);
-
-        const paddedBox = {
-            minX: box.minX - padX,
-            maxX: box.maxX + padX,
-            minY: box.minY - padY,
-            maxY: box.maxY + padY,
-        };
-
-        const vLocalPoint = shape.toVLocalPoint(globalPoint);
-        const rawY = Math.min(box.minY * shape.scaleY, box.maxY * shape.scaleY);
-        const rectY = rawY - SELECTION_PADDING;
-        const visualRotY = rectY - 20 + SELECTION_PADDING;
-
-        const diffX = vLocalPoint.x;
-        const diffY = vLocalPoint.y - visualRotY;
-        if (Math.hypot(diffX, diffY) <= 8) return 'rot';
-
-        const nearLeft = Math.abs(localPoint.x - paddedBox.minX) <= edgeX;
-        const nearRight = Math.abs(localPoint.x - paddedBox.maxX) <= edgeX;
-        const nearTop = Math.abs(localPoint.y - paddedBox.minY) <= edgeY;
-        const nearBottom = Math.abs(localPoint.y - paddedBox.maxY) <= edgeY;
-        const inY =
-            localPoint.y >= paddedBox.minY - edgeY &&
-            localPoint.y <= paddedBox.maxY + edgeY;
-        const inX =
-            localPoint.x >= paddedBox.minX - edgeX &&
-            localPoint.x <= paddedBox.maxX + edgeX;
-
-        if (nearLeft && nearTop) return 'lt';
-        if (nearRight && nearTop) return 'rt';
-        if (nearLeft && nearBottom) return 'lb';
-        if (nearRight && nearBottom) return 'rb';
-        if (nearLeft && inY) return 'l';
-        if (nearRight && inY) return 'r';
-        if (nearTop && inX) return 't';
-        if (nearBottom && inX) return 'b';
-
+        if (distS <= cornerRadius && distS <= distE) return 's';
+        if (distE <= cornerRadius) return 'e';
+        
         return null;
     }
+
+    const box = shape.getLocalBox();
+    const pad = SELECTION_PADDING * zoomCoef;
+
+    const minX = box.minX - pad;
+    const maxX = box.maxX + pad;
+    const minY = box.minY - pad;
+    const maxY = box.maxY + pad;
+
+    const vLocalPoint = shape.toVLocalPoint(globalPoint);
+    const rawY = Math.min(box.minY * shape.scaleY, box.maxY * shape.scaleY);
+    const visualRotY = rawY - pad - 20 * zoomCoef;
+
+    if (Math.hypot(vLocalPoint.x, vLocalPoint.y - visualRotY) <= cornerRadius) {
+        return 'rot';
+    }
+
+    const localPoint = shape.toLocalPoint(globalPoint);
+    
+    const dxMin = Math.abs(localPoint.x - minX);
+    const dxMax = Math.abs(localPoint.x - maxX);
+    const dyMin = Math.abs(localPoint.y - minY);
+    const dyMax = Math.abs(localPoint.y - maxY);
+
+    const dLT = Math.hypot(dxMin, dyMin);
+    const dRT = Math.hypot(dxMax, dyMin);
+    const dLB = Math.hypot(dxMin, dyMax);
+    const dRB = Math.hypot(dxMax, dyMax);
+
+    let minC = cornerRadius;
+    let closestCorner: ResizeHandle | null = null;
+
+    if (dLT <= minC) { minC = dLT; closestCorner = 'lt'; }
+    if (dRT <= minC) { minC = dRT; closestCorner = 'rt'; }
+    if (dLB <= minC) { minC = dLB; closestCorner = 'lb'; }
+    if (dRB <= minC) { minC = dRB; closestCorner = 'rb'; }
+
+    if (closestCorner) return closestCorner;
+
+    const inX = localPoint.x >= minX && localPoint.x <= maxX;
+    const inY = localPoint.y >= minY && localPoint.y <= maxY;
+
+    let minE = edgeRadius;
+    let closestEdge: ResizeHandle | null = null;
+
+    if (inY) {
+        if (dxMin <= minE) { minE = dxMin; closestEdge = 'l'; }
+        if (dxMax <= minE) { minE = dxMax; closestEdge = 'r'; }
+    }
+    if (inX) {
+        if (dyMin <= minE) { minE = dyMin; closestEdge = 't'; }
+        if (dyMax <= minE) { minE = dyMax; closestEdge = 'b'; }
+    }
+
+    return closestEdge;
+}
 
     function getGlobalCursorStyle(handle: string): string {
         const map: Record<string, string> = {
@@ -335,53 +349,56 @@ export function useInteractions(
     } {
         const selectionBox = getVisualSelectionBox();
         if (!selectionBox) return { handle: null, isInside: false };
+        
+        const zoomCoef = 100 / zoom.value;
+        const padding = SELECTION_PADDING * zoomCoef;
+        
+        const cornerRadius = 8 * zoomCoef;
+        const edgeRadius = 4 * zoomCoef;
 
-        const padding = SELECTION_PADDING;
-        const edgeThreshold = 8;
+        const minX = selectionBox.minX - padding;
+        const maxX = selectionBox.maxX + padding;
+        const minY = selectionBox.minY - padding;
+        const maxY = selectionBox.maxY + padding;
 
-        const expandedBox = {
-            minX: selectionBox.minX - padding,
-            maxX: selectionBox.maxX + padding,
-            minY: selectionBox.minY - padding,
-            maxY: selectionBox.maxY + padding,
-        };
+        const inX = point.x >= minX && point.x <= maxX;
+        const inY = point.y >= minY && point.y <= maxY;
+        const isInside = inX && inY;
 
-        const isInside =
-            point.x >= expandedBox.minX &&
-            point.x <= expandedBox.maxX &&
-            point.y >= expandedBox.minY &&
-            point.y <= expandedBox.maxY;
+        const dxMin = Math.abs(point.x - minX);
+        const dxMax = Math.abs(point.x - maxX);
+        const dyMin = Math.abs(point.y - minY);
+        const dyMax = Math.abs(point.y - maxY);
 
-        const nearLeft = Math.abs(point.x - selectionBox.minX) <= edgeThreshold;
-        const nearRight =
-            Math.abs(point.x - selectionBox.maxX) <= edgeThreshold;
-        const nearTop = Math.abs(point.y - selectionBox.minY) <= edgeThreshold;
-        const nearBottom =
-            Math.abs(point.y - selectionBox.maxY) <= edgeThreshold;
+        const dLT = Math.hypot(dxMin, dyMin);
+        const dRT = Math.hypot(dxMax, dyMin);
+        const dLB = Math.hypot(dxMin, dyMax);
+        const dRB = Math.hypot(dxMax, dyMax);
 
-        const inY = point.y >= expandedBox.minY && point.y <= expandedBox.maxY;
-        const inX = point.x >= expandedBox.minX && point.x <= expandedBox.maxX;
+        let minC = cornerRadius;
+        let closestCorner: ResizeHandle | null = null;
 
-        if (nearLeft && nearTop && isInside)
-            return { handle: 'lt', isInside: false };
-        if (nearRight && nearTop && isInside)
-            return { handle: 'rt', isInside: false };
-        if (nearLeft && nearBottom && isInside)
-            return { handle: 'lb', isInside: false };
-        if (nearRight && nearBottom && isInside)
-            return { handle: 'rb', isInside: false };
+        if (dLT <= minC) { minC = dLT; closestCorner = 'lt'; }
+        if (dRT <= minC) { minC = dRT; closestCorner = 'rt'; }
+        if (dLB <= minC) { minC = dLB; closestCorner = 'lb'; }
+        if (dRB <= minC) { minC = dRB; closestCorner = 'rb'; }
 
-        if (nearLeft && inY && isInside)
-            return { handle: 'l', isInside: false };
-        if (nearRight && inY && isInside)
-            return { handle: 'r', isInside: false };
-        if (nearTop && inX && isInside) return { handle: 't', isInside: false };
-        if (nearBottom && inX && isInside)
-            return { handle: 'b', isInside: false };
+        if (closestCorner) return { handle: closestCorner, isInside: false }; 
 
-        return { handle: null, isInside };
+        let minE = edgeRadius;
+        let closestEdge: ResizeHandle | null = null;
+
+        if (inY) {
+            if (dxMin <= minE) { minE = dxMin; closestEdge = 'l'; }
+            if (dxMax <= minE) { minE = dxMax; closestEdge = 'r'; }
+        }
+        if (inX) {
+            if (dyMin <= minE) { minE = dyMin; closestEdge = 't'; }
+            if (dyMax <= minE) { minE = dyMax; closestEdge = 'b'; }
+        }
+
+        return { handle: closestEdge, isInside };
     }
-
     function onMouseDown(e: MouseEvent) {
         const canvas = canvasRef.value;
 
@@ -1191,9 +1208,10 @@ export function useInteractions(
                     canvasStore.selectionRect.end.y
                 ),
             };
+            const zoomCoef = 1 / zoom.value * 100;
 
-            const padding = SELECTION_PADDING;
-            const edgeThreshold = 8;
+            const padding = SELECTION_PADDING * zoomCoef;
+            const edgeThreshold = 8 * zoomCoef;
 
             const expandedBox = {
                 minX: selectionBox.minX - padding,

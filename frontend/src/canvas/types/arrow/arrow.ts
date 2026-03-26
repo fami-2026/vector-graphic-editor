@@ -132,10 +132,10 @@ export class ArrowShape extends BaseShape {
         }));
     }
 
-    hitTest(globalPoint: Point): boolean {
+    hitTest(globalPoint: Point, zoomCoef: number): boolean {
         const point = this.toVLocalPoint(globalPoint);
         const points = this.getScaledLocalArrowPoints();
-        const padding = this.strokeWidth / 2 + 3;
+        const padding = (this.strokeWidth / 2 + 3) * zoomCoef;
 
         let inside = false;
         for (let i = 0; i < points.length; i++) {
@@ -251,6 +251,7 @@ export class ArrowShape extends BaseShape {
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
+        ctx.lineJoin = 'round';        
         ctx.stroke();
 
         ctx.globalAlpha = 1;

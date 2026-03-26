@@ -132,10 +132,10 @@ export class PolygonShape extends BaseShape {
         }));
     }
 
-    hitTest(globalPoint: Point): boolean {
+    hitTest(globalPoint: Point, zoomCoef: number): boolean {
         const localPoint = this.toVLocalPoint(globalPoint);
         const points = this.getLocalPoints();
-        const padding = this.strokeWidth / 2 + 3;
+        const padding = (this.strokeWidth / 2 + 3) * zoomCoef;
 
         if (points.length < 3) return false;
 
@@ -251,6 +251,7 @@ export class PolygonShape extends BaseShape {
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
+        ctx.lineJoin = 'round';        
         ctx.stroke();
 
         ctx.restore();
