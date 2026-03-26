@@ -49,6 +49,26 @@
     </div>
 
     <div
+        v-if="isSelectingRegion"
+        class="regionOverlay"
+        @mousedown="onRegionMouseDown"
+        @mousemove="onRegionMouseMove"
+        @mouseup="onRegionMouseUp"
+    >
+        <div
+            v-if="regionRect"
+            class="regionRect"
+            :style="{
+                left: regionRect.x + 'px',
+                top: regionRect.y + 'px',
+                width: regionRect.width + 'px',
+                height: regionRect.height + 'px',
+            }"
+        ></div>
+        <div class="regionHint">Нарисуйте область для экспорта · Esc — отмена</div>
+    </div>
+
+    <div
         v-if="showExport"
         class="modalOverlay"
         role="dialog"
@@ -69,6 +89,24 @@
                     @blur="normalizeFileName"
                 />
             </label>
+
+            <label class="field">
+                <span>Область экспорта</span>
+                <select v-model="form.area">
+                    <option value="scene">Весь холст</option>
+                    <option value="region">Выбрать область</option>
+                </select>
+            </label>
+
+            <div v-if="form.area === 'region'" class="field">
+                <button type="button" class="btn ghost regionBtn" @click="startRegionSelect">
+                    {{ regionBounds ? 'Изменить область' : 'Выбрать на холсте' }}
+                </button>
+                <span v-if="regionBounds" class="hint">
+                    {{ Math.round(regionBounds.width) }} × {{ Math.round(regionBounds.height) }} px
+                </span>
+                <span v-else class="hint">Область не выбрана</span>
+            </div>
 
             <label class="field">
                 <span>Фон</span>
@@ -101,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useCanvasStore } from '@/stores/canvas';
 import {
@@ -120,7 +158,7 @@ const open = ref(false);
 const showExport = ref(false);
 const root = ref<HTMLElement | null>(null);
 const canvasStore = useCanvasStore();
-const { shapes, selectedId, backgroundColor } = storeToRefs(canvasStore);
+const { shapes, selectedId, backgroundColor, zoom, pan } = storeToRefs(canvasStore);
 
 const form = reactive<{
     fileName: string;
@@ -136,6 +174,23 @@ const form = reactive<{
     pngBackground: 'transparent',
 });
 
+const isSelectingRegion = ref(false);
+const regionBounds = ref<{ x: number; y: number; width: number; height: number } | null>(null);
+const regionStart = ref<{ x: number; y: number } | null>(null);
+const regionCurrent = ref<{ x: number; y: number } | null>(null);
+
+const regionRect = computed(() => {
+    if (!regionStart.value || !regionCurrent.value) return null;
+    const x = Math.min(regionStart.value.x, regionCurrent.value.x);
+    const y = Math.min(regionStart.value.y, regionCurrent.value.y);
+    return {
+        x,
+        y,
+        width: Math.abs(regionCurrent.value.x - regionStart.value.x),
+        height: Math.abs(regionCurrent.value.y - regionStart.value.y),
+    };
+});
+
 function toggle() {
     open.value = !open.value;
 }
@@ -146,6 +201,8 @@ function close() {
 
 function openExport(format: ExportFormat) {
     form.format = format;
+    form.area = 'scene';
+    regionBounds.value = null;
     form.fileName = buildDefaultFileName(format, 'vector-export').replace(
         /\.[^.]$/,
         ''
@@ -153,6 +210,62 @@ function openExport(format: ExportFormat) {
     normalizeFileName();
     showExport.value = true;
     close();
+}
+
+function startRegionSelect() {
+    showExport.value = false;
+    isSelectingRegion.value = true;
+    regionStart.value = null;
+    regionCurrent.value = null;
+}
+
+function screenToWorld(clientX: number, clientY: number): { x: number; y: number } {
+    const canvas = document.querySelector('.main-canvas') as HTMLCanvasElement | null;
+    const rect = canvas?.getBoundingClientRect();
+    if (!rect) return { x: clientX, y: clientY };
+    const zoomFactor = zoom.value / 100;
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    return {
+        x: centerX + (screenX - centerX - pan.value.x) / zoomFactor,
+        y: centerY + (screenY - centerY - pan.value.y) / zoomFactor,
+    };
+}
+
+function onRegionMouseDown(e: MouseEvent) {
+    regionStart.value = { x: e.clientX, y: e.clientY };
+    regionCurrent.value = { x: e.clientX, y: e.clientY };
+}
+
+function onRegionMouseMove(e: MouseEvent) {
+    if (!regionStart.value) return;
+    regionCurrent.value = { x: e.clientX, y: e.clientY };
+}
+
+function onRegionMouseUp(e: MouseEvent) {
+    if (!regionStart.value) return;
+
+    const screenMinX = Math.min(regionStart.value.x, e.clientX);
+    const screenMinY = Math.min(regionStart.value.y, e.clientY);
+    const screenMaxX = Math.max(regionStart.value.x, e.clientX);
+    const screenMaxY = Math.max(regionStart.value.y, e.clientY);
+
+    const topLeft = screenToWorld(screenMinX, screenMinY);
+    const bottomRight = screenToWorld(screenMaxX, screenMaxY);
+
+    const width = bottomRight.x - topLeft.x;
+    const height = bottomRight.y - topLeft.y;
+
+    if (width > 1 && height > 1) {
+        regionBounds.value = { x: topLeft.x, y: topLeft.y, width, height };
+    }
+
+    isSelectingRegion.value = false;
+    regionStart.value = null;
+    regionCurrent.value = null;
+    showExport.value = true;
 }
 
 function closeExport() {
@@ -204,6 +317,11 @@ function exportJson() {
 async function submitExport() {
     normalizeFileName();
 
+    if (form.area === 'region' && !regionBounds.value) {
+        window.alert('Выберите область для экспорта.');
+        return;
+    }
+
     try {
         await exportScene({
             format: form.format,
@@ -214,6 +332,7 @@ async function submitExport() {
             selectedId: selectedId.value,
             pngScale: form.pngScale,
             background: resolveExportBackground(),
+            regionBounds: form.area === 'region' ? (regionBounds.value ?? undefined) : undefined,
         });
 
         closeExport();
@@ -233,8 +352,18 @@ function onDocPointerDown(e: PointerEvent) {
 }
 
 function onDocKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape') close();
-    if (e.key === 'Escape' && showExport.value) closeExport();
+    if (e.key === 'Escape') {
+        if (isSelectingRegion.value) {
+            isSelectingRegion.value = false;
+            regionStart.value = null;
+            regionCurrent.value = null;
+            showExport.value = true;
+        } else if (showExport.value) {
+            closeExport();
+        } else {
+            close();
+        }
+    }
 }
 
 onMounted(() => {
@@ -380,5 +509,39 @@ onBeforeUnmount(() => {
     justify-content: flex-end;
     gap: 8px;
     margin-top: 6px;
+}
+
+.regionBtn {
+    width: 100%;
+    justify-content: center;
+}
+
+.regionOverlay {
+    position: fixed;
+    inset: 0;
+    cursor: crosshair;
+    z-index: 100;
+    user-select: none;
+}
+
+.regionRect {
+    position: absolute;
+    border: 2px dashed #2563eb;
+    background: rgba(37, 99, 235, 0.08);
+    pointer-events: none;
+}
+
+.regionHint {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(17, 24, 39, 0.75);
+    color: #ffffff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    pointer-events: none;
+    white-space: nowrap;
 }
 </style>

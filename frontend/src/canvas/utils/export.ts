@@ -1,7 +1,7 @@
 import type { Shape, Point } from '@/canvas/types';
 
 export type ExportFormat = 'png' | 'svg';
-export type ExportArea = 'scene';
+export type ExportArea = 'scene' | 'region';
 export type PngScale = 1 | 2 | 3;
 export type ExportBackground = 'transparent' | 'white' | string;
 
@@ -19,6 +19,7 @@ export interface ExportOptions {
     sceneSize: ExportSceneSize;
     pngScale?: PngScale;
     background?: ExportBackground;
+    regionBounds?: { x: number; y: number; width: number; height: number };
 }
 
 interface ExportBounds {
@@ -73,7 +74,9 @@ export async function exportScene(options: ExportOptions): Promise<void> {
         throw new Error('Нет фигур для экспорта.');
     }
 
-    validateShapeBounds(options.shapes);
+    if (options.shapes.length > 0) {
+        validateShapeBounds(options.shapes);
+    }
 
     const fileName = ensureExtension(options.fileName, options.format);
 
@@ -85,6 +88,15 @@ export async function exportScene(options: ExportOptions): Promise<void> {
 }
 
 function resolveExportTarget(options: ExportOptions): ExportTarget | null {
+    if (options.area === 'region') {
+        if (!options.regionBounds) return null;
+        const { x, y, width, height } = options.regionBounds;
+        return {
+            shapes: options.shapes,
+            bounds: { x, y, width: Math.max(1, width), height: Math.max(1, height) },
+        };
+    }
+
     if (options.shapes.length === 0) return null;
 
     const bounds = getTotalBounds(options.shapes);
