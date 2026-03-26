@@ -62,10 +62,10 @@ export class CircleShape extends BaseShape {
         this.height = height;
     }
 
-    hitTest(globalPoint: Point): boolean {
+    hitTest(globalPoint: Point, zoomCoef: number = 1): boolean {
         const localPoint = this.toVLocalPoint(globalPoint);
-        const padding = this.strokeWidth / 2 + 3;
-        const minRadiusHit = 6;
+        const padding = (this.strokeWidth / 2 + 3) * zoomCoef;
+        const minRadiusHit = 6 * zoomCoef;
         const rX =
             Math.max(Math.abs((this.width / 2) * this.scaleX), minRadiusHit) +
             padding;
@@ -124,6 +124,7 @@ export class CircleShape extends BaseShape {
 
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
+        ctx.lineJoin = 'round';
         ctx.globalAlpha = this.strokeOpacity;
         ctx.stroke();
         ctx.globalAlpha = alpha;

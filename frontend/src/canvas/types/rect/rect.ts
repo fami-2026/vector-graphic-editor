@@ -49,9 +49,9 @@ export class RectShape extends BaseShape {
         this.height = height;
     }
 
-    hitTest(globalPoint: Point): boolean {
+    hitTest(globalPoint: Point, zoomCoef: number): boolean {
         const localPoint = this.toVLocalPoint(globalPoint);
-        const padding = this.strokeWidth / 2 + 3;
+        const padding = (this.strokeWidth / 2 + 3) * zoomCoef;
         const minHalfHit = 6;
         const halfW = Math.max(
             Math.abs(this.width * this.scaleX) / 2,
@@ -109,6 +109,7 @@ export class RectShape extends BaseShape {
 
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
+        ctx.lineJoin = 'round';
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeRect(-w / 2, -h / 2, w, h);
         ctx.globalAlpha = alpha;

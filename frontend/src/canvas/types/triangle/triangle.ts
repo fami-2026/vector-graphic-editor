@@ -115,7 +115,7 @@ export class TriangleShape extends BaseShape {
         }));
     }
 
-    hitTest(point: Point): boolean {
+    hitTest(point: Point, zoomCoef: number): boolean {
         const vertices = this.getVertices();
 
         const p1 = vertices[0];
@@ -124,7 +124,7 @@ export class TriangleShape extends BaseShape {
 
         if (!p1 || !p2 || !p3) return false;
 
-        const padding = this.strokeWidth / 2 + 3;
+        const padding = (this.strokeWidth / 2 + 3) * zoomCoef;
 
         const area =
             0.5 *
@@ -241,6 +241,7 @@ export class TriangleShape extends BaseShape {
         ctx.globalAlpha = this.strokeOpacity;
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
+        ctx.lineJoin = 'round';
         ctx.stroke();
 
         ctx.globalAlpha = 1;

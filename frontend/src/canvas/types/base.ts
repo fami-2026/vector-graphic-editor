@@ -151,7 +151,7 @@ export abstract class BaseShape {
         return { x: global.x, y: global.y };
     }
 
-    abstract hitTest(globalPoint: Point): boolean;
+    abstract hitTest(globalPoint: Point, zoomCoef?: number): boolean;
 
     abstract getBoundingBox(): BoundingBox;
 

@@ -54,7 +54,7 @@ export class LineShape extends BaseShape {
         this.localEndPoint.y = height * signY;
     }
 
-    hitTest(globalPoint: Point): boolean {
+    hitTest(globalPoint: Point, zoomCoef: number): boolean {
         const localPoint = this.toVLocalPoint(globalPoint);
         const dx = this.localEndPoint.x * this.scaleX;
         const dy = this.localEndPoint.y * this.scaleY;
@@ -70,7 +70,7 @@ export class LineShape extends BaseShape {
         const projY = t * dy;
         return (
             Math.hypot(localPoint.x - projX, localPoint.y - projY) <=
-            this.strokeWidth / 2 + 5
+            (this.strokeWidth / 2 + 3) * zoomCoef
         );
     }
 

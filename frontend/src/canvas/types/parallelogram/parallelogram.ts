@@ -109,10 +109,10 @@ export class ParallelogramShape extends BaseShape {
         ];
     }
 
-    hitTest(globalPoint: Point): boolean {
+    hitTest(globalPoint: Point, zoomCoef: number = 1): boolean {
         const localPoint = this.toVLocalPoint(globalPoint);
         const points = this.getLocalPoints();
-        const padding = this.strokeWidth / 2 + 3;
+        const padding = (this.strokeWidth / 2 + 3) * zoomCoef;
 
         let inside = false;
         for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
