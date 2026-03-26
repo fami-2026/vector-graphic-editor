@@ -336,9 +336,6 @@
                                     stroke-linecap="round"
                                 />
                                 
-                                
-
-                                <!-- Карандаш -->
                                 <polyline
                                     v-else-if="shape.type === 'pencil'"
                                     points="2,13 6,9 9,12 13,6 18,10"
@@ -348,7 +345,6 @@
                                     stroke-linecap="round"
                                     stroke-linejoin="round"
                                 />
-
                                 <!-- Все остальные полигональные фигуры -->
                                 <polygon
                                     v-else
