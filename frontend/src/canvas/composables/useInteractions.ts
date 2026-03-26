@@ -1287,27 +1287,6 @@ export function useInteractions(
             }
         }
 
-        if (hasMoved.value) {
-            if (hasRecordedInteraction.value) {
-                canvasStore.endInteraction();
-            }
-        } else {
-            if (hasRecordedInteraction.value) {
-                hasRecordedInteraction.value = false;
-            }
-        }
-
-        if (isDraggingMultiple.value || isResizingMultiple.value) {
-            if (hasRecordedInteraction.value) {
-                canvasStore.endInteraction();
-            }
-            isDraggingMultiple.value = false;
-            isResizingMultiple.value = false;
-            multiResizeStates.value.clear();
-            selectionStartBox.value = null;
-            dragStartPositions.value.clear();
-        }
-
         if (isCreating.value) {
             if (activeShape.value) {
                 if (activeShape.value.type === 'pencil') {
@@ -1344,6 +1323,25 @@ export function useInteractions(
                 canvas.style.cursor = 'default';
             }
             return;
+        }
+
+        if (isDraggingMultiple.value || isResizingMultiple.value) {
+            if (hasRecordedInteraction.value) {
+                canvasStore.endInteraction();
+                hasRecordedInteraction.value = false;
+            }
+            isDraggingMultiple.value = false;
+            isResizingMultiple.value = false;
+            multiResizeStates.value.clear();
+            selectionStartBox.value = null;
+            dragStartPositions.value.clear();
+        }
+
+        if (hasMoved.value) {
+            if (hasRecordedInteraction.value) {
+                canvasStore.endInteraction();
+                hasRecordedInteraction.value = false;
+            }
         }
 
         hasMoved.value = false;
