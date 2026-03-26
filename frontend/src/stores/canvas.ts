@@ -57,6 +57,7 @@ type VectorEditorExport = {
     format: 'vector-editor';
     version: 1;
     exportedAt: string;
+    backgroundColor: string;
     scene: SceneSnapshot;
 };
 
@@ -844,6 +845,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             format: 'vector-editor',
             version: 1,
             exportedAt: new Date().toISOString(),
+            backgroundColor: backgroundColor.value,
             scene: createSnapshot(),
         };
 
@@ -873,6 +875,9 @@ export const useCanvasStore = defineStore('canvas', () => {
             }
 
             restoreSnapshot(parsed.scene);
+            if (parsed.backgroundColor) {
+                setBackgroundColor(parsed.backgroundColor);
+            }
             undoStack.value = [];
             redoStack.value = [];
             isInteractionActive.value = false;
