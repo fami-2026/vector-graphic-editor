@@ -1,4 +1,4 @@
-# Vector (Vibe) Graphic Editor
+# Vector Graphic Editor
 
 Образовательный проект по разработке векторного графического редактора frontend (Vue 3 + TypeScript + Canvas 2D) и backend (Spring Boot + MongoDB).
 
