@@ -10,6 +10,7 @@ export { ArrowShape } from './arrow';
 export { HexagonShape } from './hexagon';
 export { ParallelogramShape } from './parallelogram';
 export { PencilShape } from './pencil';
+export { TrapezoidShape } from './trapezoid';
 export { shapeRegistry } from './registry';
 export { SELECTION_PADDING } from './base';
 

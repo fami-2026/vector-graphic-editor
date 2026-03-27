@@ -80,6 +80,12 @@ const tools: ToolConfig[] = [
         title: 'Стрелка',
         action: () => toolsStore.setActiveTool('arrow'),
     },
+    {
+        id: 'trapezoid',
+        icon: '⏢',
+        title: 'Трапеция',
+        action: () => toolsStore.setActiveTool('trapezoid'),
+    },
 ];
 
 function handleToolClick(tool: ToolConfig) {

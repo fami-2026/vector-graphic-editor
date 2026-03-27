@@ -1,0 +1,1 @@
+export { TrapezoidShape } from './trapezoid';
