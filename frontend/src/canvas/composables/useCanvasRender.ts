@@ -148,7 +148,10 @@ export function useCanvasRender(
                 ctx.strokeStyle = '#ff9800';
                 ctx.lineWidth = 1.5;
 
-                for (const [vx, vy] of [[tlX, topY], [trX, topY]] as [number, number][]) {
+                for (const [vx, vy] of [
+                    [tlX, topY],
+                    [trX, topY],
+                ] as [number, number][]) {
                     ctx.beginPath();
                     ctx.arc(vx, vy, 5, 0, Math.PI * 2);
                     ctx.fill();

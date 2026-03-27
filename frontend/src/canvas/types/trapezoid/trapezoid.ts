@@ -162,7 +162,10 @@ export class TrapezoidShape extends BaseShape {
 
         const padding = this.strokeWidth / 2 + 3;
         for (let i = 0, j = n - 1; i < n; j = i++) {
-            if (this.distanceToSegment(point, vertices[j]!, vertices[i]!) <= padding)
+            if (
+                this.distanceToSegment(point, vertices[j]!, vertices[i]!) <=
+                padding
+            )
                 return true;
         }
         return false;
