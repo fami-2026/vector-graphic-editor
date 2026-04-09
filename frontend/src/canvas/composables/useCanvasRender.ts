@@ -2,6 +2,7 @@ import type { Ref } from 'vue';
 import type { Shape, LineShape } from '@/canvas/types';
 import { SELECTION_PADDING } from '@/canvas/types';
 import { useCanvasStore } from '@/stores/canvas';
+import type { TrapezoidShape } from '@/canvas/types/trapezoid/trapezoid';
 
 function isLineShape(shape: Shape): shape is LineShape {
     return shape.type === 'line';
@@ -134,6 +135,29 @@ export function useCanvasRender(
                 ctx.fill();
                 ctx.stroke();
             });
+
+            if (shape.type === 'trapezoid') {
+                const trap = shape as TrapezoidShape;
+                const halfH = trap.height / 2;
+                const tlX = trap.topLeftX * trap.scaleX;
+                const trX = trap.topRightX * trap.scaleX;
+                const topY = -halfH * trap.scaleY;
+
+                ctx.setLineDash([0, 0]);
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#ff9800';
+                ctx.lineWidth = 1.5;
+
+                for (const [vx, vy] of [
+                    [tlX, topY],
+                    [trX, topY],
+                ] as [number, number][]) {
+                    ctx.beginPath();
+                    ctx.arc(vx, vy, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
 
             return;
         }

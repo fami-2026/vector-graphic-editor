@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, watch, ref } from 'vue';
+import { computed, nextTick, watch, ref, h } from 'vue';
 import type { Component } from 'vue';
 import {
     Hand,
@@ -17,6 +17,26 @@ import {
     CopyPlus,
     Diamond,
 } from 'lucide-vue-next';
+const TrapezoidIcon: Component = {
+    render() {
+        return h(
+            'svg',
+            {
+                xmlns: 'http://www.w3.org/2000/svg',
+                width: 18,
+                height: 18,
+                viewBox: '0 0 24 24',
+                fill: 'none',
+                stroke: 'currentColor',
+                'stroke-width': 2,
+                'stroke-linecap': 'round',
+                'stroke-linejoin': 'round',
+            },
+            [h('polygon', { points: '5,18 19,18 16,6 8,6' })]
+        );
+    },
+};
+
 import { useToolsStore, type ToolType } from '@/stores/tools';
 import { useCanvasStore } from '@/stores/canvas';
 import { storeToRefs } from 'pinia';
@@ -33,6 +53,7 @@ type ToolId =
     | 'hexagon'
     | 'parallelogram'
     | 'arrow'
+    | 'trapezoid'
     | 'eraser'
     | 'pencil';
 
@@ -54,6 +75,7 @@ const tools: Tool[] = [
     { id: 'hexagon', title: 'Шестиугольник', icon: Hexagon },
     { id: 'parallelogram', title: 'Параллелограмм', icon: Diamond },
     { id: 'arrow', title: 'Стрелка', icon: ArrowUp },
+    { id: 'trapezoid', title: 'Трапеция', icon: TrapezoidIcon },
     { id: 'eraser', title: 'Ластик', icon: Eraser },
     { id: 'pencil', title: 'Карандаш', icon: Pencil },
 ];
@@ -133,6 +155,9 @@ function handleClick(tool: Tool) {
         case 'arrow':
             toolsStore.setActiveTool('arrow');
             break;
+        case 'trapezoid':
+            toolsStore.setActiveTool('trapezoid');
+            break;
         case 'eraser':
             toolsStore.setActiveTool('eraser');
             break;
@@ -179,6 +204,7 @@ const activeId = computed<ToolId>(() => {
     if (active === 'hexagon') return 'hexagon';
     if (active === 'parallelogram') return 'parallelogram';
     if (active === 'arrow') return 'arrow';
+    if (active === 'trapezoid') return 'trapezoid';
     if (active === 'eraser') return 'eraser';
     if (active === 'pencil') return 'pencil';
     return 'cursor';

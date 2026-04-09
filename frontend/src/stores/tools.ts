@@ -14,7 +14,8 @@ export type ToolType =
     | 'parallelogram'
     | 'arrow'
     | 'eraser'
-    | 'pencil';
+    | 'pencil'
+    | 'trapezoid';
 
 type CreationParams = Record<string, unknown> | null;
 

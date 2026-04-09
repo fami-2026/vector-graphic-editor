@@ -9,6 +9,7 @@ import type {
 import { useCanvasStore } from '@/stores/canvas';
 import { useToolsStore, type ToolType } from '@/stores/tools';
 import { SELECTION_PADDING } from '@/canvas/types';
+import type { TrapezoidShape } from '@/canvas/types/trapezoid/trapezoid';
 
 type ResizeHandle =
     | 'l'
@@ -21,7 +22,9 @@ type ResizeHandle =
     | 'rb'
     | 's'
     | 'e'
-    | 'rot';
+    | 'rot'
+    | 'tlv'
+    | 'trv';
 
 interface ShapeResizeState {
     shape: Shape;
@@ -196,6 +199,23 @@ export function useInteractions(
         const cornerRadius = 8 * zoomCoef;
         const edgeRadius = 4 * zoomCoef;
 
+        if (shape.type === 'trapezoid') {
+            const trap = shape as TrapezoidShape;
+            const vInv = trap.getInverseVMatrix();
+            const vPt = new DOMPoint(
+                globalPoint.x,
+                globalPoint.y
+            ).matrixTransform(vInv);
+
+            const halfH = trap.height / 2;
+            const tlX = trap.topLeftX * Math.abs(trap.scaleX);
+            const trX = trap.topRightX * Math.abs(trap.scaleX);
+            const topY = -halfH * Math.abs(trap.scaleY);
+
+            if (Math.hypot(vPt.x - tlX, vPt.y - topY) <= 8) return 'tlv';
+            if (Math.hypot(vPt.x - trX, vPt.y - topY) <= 8) return 'trv';
+        }
+
         if (shape.type === 'line') {
             const line = shape as LineShape;
             if (!line.localEndPoint) return null;
@@ -317,6 +337,7 @@ export function useInteractions(
 
     function getCursorStyle(handle: string, shape: Shape): string {
         if (handle === 's' || handle === 'e') return 'crosshair';
+        if (handle === 'tlv' || handle === 'trv') return 'ew-resize';
         if (handle === 'rot') return 'grabbing';
 
         const handleAngles: Partial<Record<ResizeHandle, number>> = {
@@ -538,6 +559,7 @@ export function useInteractions(
             'star',
             'hexagon',
             'arrow',
+            'trapezoid',
         ];
 
         if (creatingTools.includes(toolsStore.activeTool)) {
@@ -1105,6 +1127,28 @@ export function useInteractions(
             const localMouse = new DOMPoint(point.x, point.y).matrixTransform(
                 mInv
             );
+
+            if (
+                activeShape.value.type === 'trapezoid' &&
+                (handle === 'tlv' || handle === 'trv')
+            ) {
+                if (!hasRecordedInteraction.value) {
+                    canvasStore.startInteraction();
+                    hasRecordedInteraction.value = true;
+                }
+                const trap = activeShape.value as TrapezoidShape;
+                const localMouse = new DOMPoint(
+                    point.x,
+                    point.y
+                ).matrixTransform(mInv);
+                if (handle === 'tlv') {
+                    trap.topLeftX = localMouse.x;
+                } else {
+                    trap.topRightX = localMouse.x;
+                }
+                canvas.style.cursor = 'ew-resize';
+                return;
+            }
 
             if (
                 activeShape.value.type === 'line' &&

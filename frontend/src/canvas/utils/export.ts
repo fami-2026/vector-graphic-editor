@@ -290,6 +290,15 @@ function shapeToSvgElement(shape: Shape): string | null {
                 .join(' ');
             return `<polygon points="${pointsStr}"${transform}${style}/>`;
         }
+        case 'trapezoid': {
+            if (!s.getLocalPoints) return null;
+            const points = s.getLocalPoints();
+            if (!points || points.length === 0) return null;
+            const pointsStr = points
+                .map((p: Point) => `${p.x},${p.y}`)
+                .join(' ');
+            return `<polygon points="${pointsStr}"${transform}${style}/>`;
+        }
         case 'pencil': {
             const points = s.points;
             if (!points || points.length === 0) return null;
